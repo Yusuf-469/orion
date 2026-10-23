@@ -17,6 +17,7 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Task/step state machine | verified | `tests/unit/test_states_and_store.py` |
 | SQLite store (tasks, steps, events) | verified | same file; incl. 4-thread concurrent write test |
 | Kill switch (latching, cancels all tasks) | implemented-mock | 10 trials (mock): max 141 ms, mean 64 ms to stop, 0 actions started after stop (run 2026-10-24) |
+| Kill switch reports "stopping N task(s)" until uninterruptible actions end (spec 11.6) | implemented-mock | `test_uninterruptible_action_reported_honestly`, commit 1f82cf7 |
 | STOP button → cancelled and visible in UI | implemented-mock | offscreen UI test: 47 ms; UI max timer gap 36 ms during task |
 | Global hotkey (Ctrl+Alt+End) | implemented-real (partial) | `-m real` test: OS registration succeeded and WM_HOTKEY handling engaged the switch. **Physical key press not yet tested** (manual M7) |
 | Dry-run mode (default ON) | verified (mock) | executor never calls actions; steps `skipped`, `started_at` NULL |
@@ -30,8 +31,8 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24)
-`-m "not real"` offscreen: **40 passed**. `-m real`: **1 passed**. All action tests are mock: no real desktop control exists yet.
+`-m "not real"` offscreen: **41 passed**. `-m real`: **1 passed**. All action tests are mock: no real desktop control exists yet.
 
 ## Open issues
-- Master spec `docs/ORION_Master_Technical_Documentation.md` still missing.
+- Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.
 - CUDA PyTorch not installed (needs approval; not needed until Week 8).
