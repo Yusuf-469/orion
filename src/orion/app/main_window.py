@@ -1,32 +1,57 @@
-"""Stage 1 desktop shell: task input, task list, live log, kill switch, dry-run."""
+"""Desktop shell: task input, tool console, task list, live log, kill switch, dry-run."""
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from datetime import datetime
 from typing import Any
 
+from pydantic import ValidationError
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
+    QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
     QPlainTextEdit, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from orion.app import hotkey
+from orion.app.confirm import QtConfirmer
 from orion.config import OrionConfig
 from orion.execution import Action, DryRunExecutor, RealExecutor
+from orion.execution.runtime import ToolCall, ToolRuntime
+from orion.execution.tool_action import tool_action
 from orion.memory import TaskStore
 from orion.orchestration.cancel import KillSwitch, KillSwitchEngaged
 from orion.orchestration.runner import TaskRunner, simulated_action
+from orion.policy import PolicyEngine
+from orion.tools import ToolRegistry
+from orion.tools.files import file_tools
+from orion.tools.windows.launch import LaunchAppTool
 
 log = logging.getLogger("orion.app")
 
 _STATUS_COLORS = {
     "running": "#1565c0", "succeeded": "#2e7d32", "failed": "#c62828",
-    "cancelled": "#ef6c00", "skipped": "#6a1b9a",
+    "cancelled": "#ef6c00", "skipped": "#6a1b9a", "blocked": "#ad6800", "needs_review": "#c62828",
 }
+
+TOOL_EXAMPLES: dict[str, dict[str, Any]] = {
+    "files.list": {"path": "."},
+    "files.read": {"path": "hello.txt"},
+    "files.write_new": {"path": "hello.txt", "content": "Hello from ORION"},
+    "files.copy": {"src": "hello.txt", "dst": "hello_copy.txt"},
+    "files.delete": {"path": "hello_copy.txt"},
+    "app.launch": {"app": "notepad"},
+}
+
+
+def build_registry() -> ToolRegistry:
+    reg = ToolRegistry()
+    for t in [*file_tools(), LaunchAppTool()]:
+        reg.register(t)
+    return reg
 
 
 class _EventBridge(QObject):
@@ -62,7 +87,13 @@ class MainWindow(QMainWindow):
         self._ks_poll.setInterval(200)
         self._ks_poll.timeout.connect(self._update_ks_label)
 
-        self.setWindowTitle("ORION (Stage 1 shell)")
+        cfg.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.registry = build_registry()
+        self.confirmer = QtConfirmer(self)
+        self.policy = PolicyEngine(frozenset(cfg.granted_permissions), cfg.confirm_reversible)
+        self.tool_runtime = ToolRuntime(self.registry, self.policy, self.confirmer, cfg.workspace_dir)
+
+        self.setWindowTitle("ORION (Stage 2)")
         self.resize(1000, 700)
         self._build_ui()
         self._refresh_tasks()
@@ -72,25 +103,54 @@ class MainWindow(QMainWindow):
     # --- UI ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        banner = QLabel("Stage 1 shell: every task runs a SIMULATED job that only waits. "
-                        "No real desktop, browser or file actions exist yet.")
+        granted = ", ".join(self.cfg.granted_permissions)
+        banner = QLabel(
+            f"Stage 2: goals are not interpreted yet. Use the tool console to run one registered tool, "
+            f"or run a simulated task. Files are confined to: {self.cfg.workspace_dir.resolve()}  |  "
+            f"Granted: {granted}")
         banner.setWordWrap(True)
         banner.setStyleSheet("background:#fff3cd;color:#664d03;padding:6px;border-radius:4px;")
 
         self.task_input = QLineEdit()
-        self.task_input.setPlaceholderText("Describe a task (Stage 1: text is recorded, not interpreted)")
+        self.task_input.setPlaceholderText("Simulated task title (text is recorded, not interpreted)")
         self.task_input.returnPressed.connect(self.start_task)
         self.dry_run_box = QCheckBox("Dry run (plan only, execute nothing)")
         self.dry_run_box.setChecked(self.cfg.dry_run_default)
         self.fail_box = QCheckBox("Inject failure at step 5")
-        self.run_btn = QPushButton("Run")
+        self.run_btn = QPushButton("Run simulated")
         self.run_btn.clicked.connect(self.start_task)
 
         row = QHBoxLayout()
         row.addWidget(self.task_input, 1)
-        row.addWidget(self.dry_run_box)
         row.addWidget(self.fail_box)
         row.addWidget(self.run_btn)
+
+        self.tool_combo = QComboBox()
+        for spec in self.registry.specs():
+            self.tool_combo.addItem(spec.id)
+            self.tool_combo.setItemData(
+                self.tool_combo.count() - 1,
+                f"{spec.description}\nside effect: {spec.side_effect}\n"
+                f"needs: {', '.join(sorted(spec.permissions)) or 'nothing'}", Qt.ToolTipRole)
+        self.tool_args = QLineEdit()
+        self.tool_args.setFont(QFont("Consolas", 9))
+        self.tool_combo.currentTextChanged.connect(
+            lambda tid: self.tool_args.setText(json.dumps(TOOL_EXAMPLES.get(tid, {}))))
+        self.tool_combo.setCurrentIndex(self.tool_combo.findText("files.list"))
+        self.tool_args.setText(json.dumps(TOOL_EXAMPLES["files.list"]))
+        self.tool_args.returnPressed.connect(self.start_tool)
+        self.tool_btn = QPushButton("Run tool")
+        self.tool_btn.clicked.connect(self.start_tool)
+        tool_row = QHBoxLayout()
+        tool_row.addWidget(QLabel("Tool:"))
+        tool_row.addWidget(self.tool_combo)
+        tool_row.addWidget(QLabel("Args (JSON):"))
+        tool_row.addWidget(self.tool_args, 1)
+        tool_row.addWidget(self.tool_btn)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(self.dry_run_box)
+        mode_row.addStretch(1)
 
         self.stop_btn = QPushButton(f"STOP ALL  ({self.cfg.kill_hotkey.upper()})")
         self.stop_btn.setMinimumHeight(44)
@@ -131,6 +191,8 @@ class MainWindow(QMainWindow):
 
         root = QVBoxLayout()
         root.addWidget(banner)
+        root.addLayout(mode_row)
+        root.addLayout(tool_row)
         root.addLayout(row)
         root.addWidget(self.stop_btn)
         root.addLayout(ks_row)
@@ -167,7 +229,7 @@ class MainWindow(QMainWindow):
         tasks = self.store.list_tasks()
         self.table.setRowCount(len(tasks))
         for r, t in enumerate(tasks):
-            vals = [str(t["id"]), t["title"], "dry-run" if t["dry_run"] else "live (simulated)",
+            vals = [str(t["id"]), t["title"], "dry-run" if t["dry_run"] else "live",
                     t["status"], datetime.fromtimestamp(t["updated_at"]).strftime("%H:%M:%S")]
             for c, v in enumerate(vals):
                 item = QTableWidgetItem(v)
@@ -178,21 +240,39 @@ class MainWindow(QMainWindow):
     # --- actions -------------------------------------------------------------
 
     def start_task(self) -> int | None:
-        title = self.task_input.text().strip() or "(untitled simulated task)"
-        dry_run = self.dry_run_box.isChecked()
+        title = "[simulated] " + (self.task_input.text().strip() or "untitled")
         actions = build_simulated_task(self.cfg, self.fail_box.isChecked())
+        task_id = self._launch(title, actions)
+        if task_id is not None:
+            self.task_input.clear()
+        return task_id
+
+    def start_tool(self) -> int | None:
+        tool_id = self.tool_combo.currentText()
+        try:
+            args = json.loads(self.tool_args.text() or "{}")
+            if not isinstance(args, dict):
+                raise ValueError("arguments must be a JSON object")
+            call = ToolCall(tool_id=tool_id, args=args)
+        except (ValueError, ValidationError) as e:
+            self._show_error(f"invalid tool arguments: {e}")
+            return None
+        return self._launch(f"[tool] {tool_id}", [tool_action(self.tool_runtime, call)])
+
+    def _launch(self, title: str, actions: list[Action]) -> int | None:
+        dry_run = self.dry_run_box.isChecked()
         try:
             token = self.kill_switch.new_token()
         except KillSwitchEngaged as e:
             self._show_error(str(e))
             return None
+        self.error_label.hide()
         task_id = self.runner.create(title, actions, dry_run)
         executor = DryRunExecutor() if dry_run else RealExecutor()
         th = threading.Thread(target=self.runner.run, args=(task_id, actions, executor, token),
                               name=f"task-{task_id}", daemon=True)
         self._threads = [t for t in self._threads if t.is_alive()] + [th]
         th.start()
-        self.task_input.clear()
         self._refresh_tasks()
         return task_id
 
@@ -224,7 +304,7 @@ class MainWindow(QMainWindow):
         if self._closed:  # events queued before close may arrive after the store is closed
             return
         self._append_log(f"[task {e['task_id']}] {e['level']:<7} {e['message']}")
-        if e["kind"] in ("task_failed", "step_failed"):
+        if e["kind"] in ("task_failed", "step_failed", "task_blocked"):
             self._show_error(e["message"])
         self._refresh_tasks()
 

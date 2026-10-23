@@ -25,14 +25,27 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | App launch and clean exit | verified | `python -m orion` launched, window "ORION (Stage 1 shell)", WM_CLOSE → exit code 0 (log) |
 | Physical hotkey press engages kill switch | verified (real) | `data/orion.db` event 2026-10-24 01:20:54 "kill switch engaged via hotkey ctrl+alt+end" from the user's key press |
 | Manual UI checklist M1 to M11 | partially verified | User reported "working" 2026-10-24. Evidence in DB: M1 (launch) and the hotkey engaging the switch. No tasks were recorded, so M2 to M6 and M8 to M11 have **no stored evidence**; M7 is only partly shown (switch engaged, but no running task to cancel). |
-| Tool registry, policy engine (Stage 2) | planned | |
+| Tool contract, error taxonomy (spec 8.1/8.4), registry | implemented-mock | `tests/safety/test_policy_and_runtime.py` |
+| Policy engine (allow/confirm/deny; consequential always confirms; no relabel) | implemented-mock | same file, 22 passed |
+| Runtime: timeout, cancel (incl. during confirmation), retries only for idempotent tools, uncertain outcomes flagged | implemented-mock | same file |
+| File tools in workspace (read, write_new, copy, list, delete→trash) with read-back verification | implemented-real (tmp dir) | `tests/safety/test_file_tools.py` 30 passed, incl. real junction-escape test |
+| app.launch (notepad/calculator/paint allowlist) with new-window verification | implemented-real | real test: Calculator window verified in 0.22 s, closed by the test |
+| UI tool console and confirmation dialog (kill switch closes it) | implemented-mock (offscreen) | `tests/integration/test_tool_console.py` |
+| Stage 2 docs (tool and permission reference) and manual check | planned | **next session** |
 | Planner, task graph, resume (Stage 3) | planned | |
 | UIA / browser perception and verification (Stage 4) | planned | |
 | Recovery (Stage 5) | planned | |
 | Grounding research (Stage 6) | planned | |
 
-## Test totals (2026-10-24)
-`-m "not real"` offscreen: **41 passed**. `-m real`: **1 passed**. All action tests are mock: no real desktop control exists yet.
+## Test totals (2026-10-24, end of session)
+`-m "not real"` offscreen: **109 passed**. `-m real`: **2 passed** (hotkey message handling, Calculator launch).
+
+## RESUME HERE (Stage 2, in progress)
+Code for Stage 2 is done and tested. Remaining before the Stage 2 gate:
+1. Write `docs/tools-and-permissions.md` (tool reference: id, side effect, permissions, verification); update `architecture.md` and `safety-and-privacy.md`.
+2. Manual check in the app: tool console write/read/list, delete denied by default, then grant `files.delete` in `orion.toml` and confirm Yes/No, STOP while the dialog is open, `app.launch` notepad.
+3. Known limitation to document: Notepad on Win 11 may open a tab in an existing window, so `app.launch notepad` reports verification_failed when Notepad is already open.
+4. Then stop at the Stage 2 gate for approval.
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.

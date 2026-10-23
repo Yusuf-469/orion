@@ -81,10 +81,23 @@ class TaskRunner:
                     final = Status.CANCELLED
                     break
                 if not res.ok:
-                    self.store.set_step_status(sid, Status.FAILED, res.evidence)
-                    self._emit(task_id, "ERROR", "step_failed", f"step {step['idx']} failed: {res.evidence}",
-                               step=step["idx"])
-                    final, error = Status.FAILED, res.evidence
+                    if res.blocked:
+                        # Refused before running: nothing happened, so the task is blocked, not failed.
+                        self.store.set_step_status(sid, Status.BLOCKED, res.evidence)
+                        self._emit(task_id, "WARNING", "step_blocked",
+                                   f"step {step['idx']} blocked: {res.evidence}", step=step["idx"])
+                        final, error = Status.BLOCKED, res.evidence
+                    elif res.uncertain:
+                        self.store.set_step_status(sid, Status.NEEDS_REVIEW, res.evidence)
+                        self._emit(task_id, "ERROR", "step_failed",
+                                   f"step {step['idx']} outcome uncertain, needs review: {res.evidence}",
+                                   step=step["idx"])
+                        final, error = Status.FAILED, res.evidence
+                    else:
+                        self.store.set_step_status(sid, Status.FAILED, res.evidence)
+                        self._emit(task_id, "ERROR", "step_failed", f"step {step['idx']} failed: {res.evidence}",
+                                   step=step["idx"])
+                        final, error = Status.FAILED, res.evidence
                     break
                 self.store.set_step_status(sid, Status.SUCCEEDED, res.evidence)
                 self._emit(task_id, "INFO", "step_done", f"step {step['idx']}: {res.evidence}", step=step["idx"])
@@ -110,10 +123,13 @@ class TaskRunner:
                        stop_latency_s=latency)
         elif final == Status.FAILED:
             self._emit(task_id, "ERROR", "task_failed", f"task {task_id} failed: {error}")
+        elif final == Status.BLOCKED:
+            self._emit(task_id, "WARNING", "task_blocked", f"task {task_id} blocked: {error}")
         elif final == Status.SKIPPED:
             self._emit(task_id, "INFO", "task_dry_run_done",
                        f"task {task_id}: dry run complete, {len(actions)} actions planned, 0 executed")
         else:
+            kind = "simulated " if all(a.simulated for a in actions) else ""
             self._emit(task_id, "INFO", "task_succeeded",
-                       f"task {task_id} finished: all {len(actions)} simulated steps completed")
+                       f"task {task_id} finished: all {len(actions)} {kind}steps completed")
         return final

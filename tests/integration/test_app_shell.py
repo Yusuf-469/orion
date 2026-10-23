@@ -30,15 +30,28 @@ def _pump(qapp, seconds, until=None):
 
 
 @pytest.fixture
-def window(qapp, tmp_path):
+def make_window(qapp, tmp_path):
     from orion.app.main_window import MainWindow
-    cfg = OrionConfig(data_dir=tmp_path, simulated_steps=10, simulated_step_seconds=0.3)
-    store = TaskStore(cfg.db_path)
-    w = MainWindow(cfg, store, register_hotkey=False)
-    w.show()
-    yield w
-    w.close()
-    store.close()
+    made = []
+
+    def make(**overrides):
+        cfg = OrionConfig(data_dir=tmp_path, workspace_dir=tmp_path / "workspace", simulated_steps=10,
+                          simulated_step_seconds=0.3, **overrides)
+        store = TaskStore(cfg.db_path)
+        w = MainWindow(cfg, store, register_hotkey=False)
+        w.show()
+        made.append((w, store))
+        return w
+
+    yield make
+    for w, store in made:
+        w.close()
+        store.close()
+
+
+@pytest.fixture
+def window(make_window):
+    return make_window()
 
 
 def test_parse_hotkey():
@@ -140,7 +153,7 @@ def test_real_hotkey_registration_and_wm_hotkey_handling(qapp, tmp_path):
     import ctypes
     from orion.app.main_window import MainWindow
 
-    cfg = OrionConfig(data_dir=tmp_path)
+    cfg = OrionConfig(data_dir=tmp_path, workspace_dir=tmp_path / "workspace")
     store = TaskStore(cfg.db_path)
     w = MainWindow(cfg, store, register_hotkey=True)
     w.show()

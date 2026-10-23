@@ -12,7 +12,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from orion.tools.base import Permission
+
 DEFAULT_CONFIG_NAME = "orion.toml"
+
+# Least privilege: deleting is not granted unless the user adds it in orion.toml.
+DEFAULT_PERMISSIONS = (Permission.FILES_READ, Permission.FILES_WRITE, Permission.APP_LAUNCH)
 
 
 class OrionConfig(BaseModel):
@@ -25,6 +30,11 @@ class OrionConfig(BaseModel):
     kill_hotkey: str = "ctrl+alt+end"
     simulated_steps: int = Field(default=10, ge=1, le=100)
     simulated_step_seconds: float = Field(default=1.0, gt=0, le=30)
+    # The only folder file tools may touch.
+    workspace_dir: Path = Path("workspace")
+    granted_permissions: tuple[Permission, ...] = DEFAULT_PERMISSIONS
+    # Ask before reversible local changes too (consequential actions always ask).
+    confirm_reversible: bool = False
 
     @field_validator("kill_hotkey")
     @classmethod

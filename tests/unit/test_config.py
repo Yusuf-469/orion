@@ -33,6 +33,21 @@ def test_unknown_key_rejected(tmp_path):
         load_config(p)
 
 
+def test_default_permissions_exclude_delete():
+    from orion.tools import Permission
+    assert Permission.FILES_DELETE not in OrionConfig().granted_permissions
+
+
+def test_permissions_from_file_and_typos_rejected(tmp_path):
+    from orion.tools import Permission
+    p = tmp_path / "orion.toml"
+    p.write_text('[orion]\ngranted_permissions = ["files.read", "files.delete"]\n')
+    assert set(load_config(p).granted_permissions) == {Permission.FILES_READ, Permission.FILES_DELETE}
+    p.write_text('[orion]\ngranted_permissions = ["files.everything"]\n')
+    with pytest.raises(ValidationError):
+        load_config(p)
+
+
 def test_wrong_type_rejected(tmp_path):
     p = tmp_path / "orion.toml"
     p.write_text('[orion]\nsimulated_steps = "many"\n')

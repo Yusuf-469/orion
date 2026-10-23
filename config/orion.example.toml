@@ -6,3 +6,7 @@ dry_run_default = true         # new tasks start in dry-run unless unticked
 kill_hotkey = "ctrl+alt+end"   # global kill switch
 simulated_steps = 10           # Stage 1 only: length of the simulated task
 simulated_step_seconds = 1.0
+workspace_dir = "workspace"    # file tools are confined to this folder (gitignored)
+# Least privilege. Add "files.delete" to allow deleting (moves to workspace/.orion_trash; always asks first).
+granted_permissions = ["files.read", "files.write", "app.launch"]
+confirm_reversible = false     # true = also ask before creating/copying files or opening apps
