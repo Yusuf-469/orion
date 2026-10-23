@@ -20,6 +20,12 @@ def test_load_from_file(tmp_path):
     assert cfg.kill_hotkey == "ctrl+alt+f12"
 
 
+def test_utf8_bom_accepted(tmp_path):
+    p = tmp_path / "orion.toml"
+    p.write_bytes(b"\xef\xbb\xbf[orion]\nlog_level = \"ERROR\"\n")
+    assert load_config(p).log_level == "ERROR"
+
+
 def test_unknown_key_rejected(tmp_path):
     p = tmp_path / "orion.toml"
     p.write_text("[orion]\ndry_run_defualt = false\n")

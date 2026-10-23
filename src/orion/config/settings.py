@@ -53,6 +53,6 @@ def load_config(path: Path | None = None) -> OrionConfig:
         if not candidate.exists():
             return OrionConfig()
         path = candidate
-    with open(path, "rb") as f:
-        raw = tomllib.load(f)
+    # utf-8-sig: Windows editors and PowerShell 5.1 often write a BOM, which tomllib rejects.
+    raw = tomllib.loads(Path(path).read_text(encoding="utf-8-sig"))
     return OrionConfig(**raw.get("orion", {}))
