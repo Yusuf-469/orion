@@ -83,6 +83,27 @@ def test_ui_responsive_during_task_and_stop_within_2s(qapp, window):
     assert window.kill_switch.engaged and window.reset_btn.isEnabled()
 
 
+def test_uninterruptible_action_reported_honestly(qapp, window, monkeypatch):
+    """Spec 11.6: if the current action cannot be interrupted, the UI must say so."""
+    from orion.app import main_window as mw
+    from orion.execution import Action
+
+    def stubborn(token):
+        time.sleep(0.8)  # ignores the token on purpose
+        return "slept 0.8s"
+
+    monkeypatch.setattr(mw, "build_simulated_task", lambda cfg, fail: [Action("stubborn", stubborn)] * 3)
+    window.dry_run_box.setChecked(False)
+    tid = window.start_task()
+    _pump(qapp, 0.2)
+    window.stop_btn.click()
+    assert "stopping 1 task" in window.ks_label.text()
+    assert _pump(qapp, 3.0, until=lambda: "all tasks stopped" in window.ks_label.text())
+    assert window.store.get_task(tid)["status"] == "cancelled"
+    # the in-flight action finished; the remaining two never started
+    assert [s["status"] for s in window.store.list_steps(tid)] == ["succeeded", "cancelled", "cancelled"]
+
+
 def test_engaged_switch_blocks_new_task_visibly(qapp, window):
     window.engage_kill_switch("test")
     assert window.start_task() is None

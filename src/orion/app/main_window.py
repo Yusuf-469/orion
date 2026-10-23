@@ -7,7 +7,7 @@ import threading
 from datetime import datetime
 from typing import Any
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
@@ -57,6 +57,10 @@ class MainWindow(QMainWindow):
         self._threads: list[threading.Thread] = []
         self._hotkey_registered = False
         self._closed = False
+
+        self._ks_poll = QTimer(self)
+        self._ks_poll.setInterval(200)
+        self._ks_poll.timeout.connect(self._update_ks_label)
 
         self.setWindowTitle("ORION (Stage 1 shell)")
         self.resize(1000, 700)
@@ -140,9 +144,19 @@ class MainWindow(QMainWindow):
     def _append_log(self, text: str) -> None:
         self.log_pane.appendPlainText(f"{datetime.now():%H:%M:%S.%f}"[:-3] + "  " + text)
 
+    def _alive_threads(self) -> list[threading.Thread]:
+        return [t for t in self._threads if t.is_alive()]
+
     def _update_ks_label(self) -> None:
         if self.kill_switch.engaged:
-            self.ks_label.setText("Kill switch ENGAGED: all tasks stopped; new tasks are blocked until reset.")
+            # Spec 11.6: say so when an action cannot be interrupted immediately.
+            n = len(self._alive_threads())
+            if n:
+                self.ks_label.setText(f"Kill switch ENGAGED: stopping {n} task(s); waiting for the "
+                                      f"current action to end. New tasks are blocked.")
+            else:
+                self.ks_label.setText("Kill switch ENGAGED: all tasks stopped; new tasks are blocked until reset.")
+                self._ks_poll.stop()
             self.ks_label.setStyleSheet("color:#c62828;font-weight:bold;")
         else:
             self.ks_label.setText("Kill switch armed.")
@@ -188,9 +202,11 @@ class MainWindow(QMainWindow):
         self.store.add_event(None, "WARNING", "kill_switch", f"kill switch engaged via {source}")
         self._append_log(f"KILL SWITCH engaged via {source}")
         self._update_ks_label()
+        if self._alive_threads():
+            self._ks_poll.start()
 
     def reset_kill_switch(self) -> None:
-        if any(t.is_alive() for t in self._threads):
+        if self._alive_threads():
             self._show_error("Tasks are still stopping; reset again in a moment.")
             return
         self.kill_switch.reset()

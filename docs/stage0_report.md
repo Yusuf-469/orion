@@ -13,7 +13,7 @@ Labels: `VERIFIED` (command run, output in `artifacts/env_audit_raw.txt` or quot
 | 0.1 | `C:\ORION` was **empty** at audit start (recursive listing returned nothing). Nothing existed to preserve. | VERIFIED |
 | 0.2 | `C:\ORION` is **not a git repository** (`fatal: not a git repository`). | VERIFIED |
 | 0.3 | `CLAUDE.md`, `docs/ORION_Master_Technical_Documentation.md` and `docs/12_WEEK_PLAN.md` **do not exist** on disk. The CLAUDE.md content and the 12-week planner were provided as pasted text in chat. **The master spec has not been provided.** | VERIFIED |
-| 0.4 | Because the spec is missing, references in this report to "spec section N" come from the planner's citations, not from the spec itself. | VERIFIED (limitation) |
+| 0.4 | Because the spec is missing, references in this report to "spec section N" come from the planner's citations, not from the spec itself. **Resolved 2026-10-24:** spec copied from the user's Downloads into `docs/` (SHA-256 7BE8E54E…7726, identical to source); see section 10 for the spec-alignment check. | VERIFIED |
 | 0.5 | Files created during Stage 0: `scripts/env_audit.ps1` (read-only audit script), `artifacts/env_audit_raw.txt` (its output), `docs/stage0_report.md` (this file). No existing file was modified. | VERIFIED |
 
 ---
@@ -184,6 +184,7 @@ S8 is added because mixed DPI was measured in section 1. | PROPOSED
 | B2 | OCR plus exact/fuzzy text match only |
 | B3 | Pretrained grounding model, zero-shot (Florence-2 first; a 2B UI-VLM if it fits in VRAM) |
 | B4 | Rule-based fusion of B1 to B3 |
+| B5 | Simple visual matching (template/feature matching against a reference crop): **required by spec 6.6, missing from the planner and CLAUDE.md** |
 | P  | Candidates from B1, B2 and B3 → features (text similarity, role, position, size, visual-embedding similarity, source agreement) → gradient-boosted re-ranker → calibrated abstention threshold chosen on validation |
 
 **Metrics.** Target-selection accuracy (headline), IoU@0.5 and IoU@0.7, accuracy on unseen families, abstention precision and recall, latency (p50/p95), peak RAM and VRAM. 95% bootstrap CIs (≥ 1,000 resamples) and a paired test of P vs. the best baseline on the same items. Per-slice error analysis (control type, theme, scale, ambiguity).
@@ -246,3 +247,32 @@ Steps needing approval are marked ⚠.
 4. ⚠ Separately, when you choose: install the CUDA PyTorch wheel in the venv (~3 GB) and verify `torch.cuda.is_available()` → this resolves A3.
 5. Implement in small commits: `config/` loader → `observability/` JSON logger plus redaction filter (with unit tests) → `memory/` SQLite schema (tasks, steps, events) → `orchestration/` cancel token and simulated long task → `app/` PySide6 window (input, task list, log pane, Stop button, global hotkey, dry-run toggle).
 6. Stage 1 gate evidence: UI stays responsive during the simulated task; kill switch measured over 10 trials (≤ 2 s); dry-run executes nothing (asserted by test); `STATUS.md` created with evidence.
+
+---
+
+## 10. Addendum (2026-10-24): spec received; alignment check
+
+The spec (`docs/ORION_Master_Technical_Documentation.md`) arrived after this report and Stage 1 were written. Each line below was checked against its text.
+
+### 10.1 Stage 0 items the spec requires that the first audit missed (now done)
+Spec section 16, Stage 0, also asks for **permissions** and **installed applications**. Raw output: `artifacts/env_audit_addendum_raw.txt`.
+
+| Finding | Label |
+|---|---|
+| User `yusuf` is in Administrators, but processes run **non-elevated**; UAC on (`EnableLUA=1`, consent prompt on secure desktop). ORION will run non-elevated and never request elevation (spec 11.3). | VERIFIED |
+| Notepad is the **Store/WinUI Notepad 11.2607.14.0**, not classic Notepad; Calculator 11.2607.0.0 and Paint 11.2605.81.0 are present. This raises risk A4 (UIA tree differs from classic Notepad). | VERIFIED (versions) / ASSUMPTION (UIA impact) |
+| Browsers: Chrome, Edge, Brave installed; Firefox not. Playwright will use its own bundled Chromium with a throwaway profile, never these browsers' real profiles. | VERIFIED / PROPOSED |
+| Microsoft Office folder present (version and licence not checked); LibreOffice absent. Document tools stay file-based (csv/txt/xlsx via Python), not Office automation. | VERIFIED / PROPOSED |
+
+### 10.2 Gaps between the spec and the plan or Stage 1 code
+| Spec | Gap | Action | Label |
+|---|---|---|---|
+| 6.6 baselines | Spec lists **simple visual matching**; planner/CLAUDE.md omit it | Added as B5 in section 6; planner change needs your approval | PROPOSED |
+| 11.6 emergency stop | "Communicate if an operation cannot be interrupted immediately." Stage 1 UI claimed "all tasks stopped" instantly | **Fixed**: label now says "stopping N task(s)…" until threads end; test `test_uninterruptible_action_reported_honestly` | VERIFIED (mock) |
+| 9 outcomes | Spec outcomes include **partially complete** and **unverified**; current statuses do not | Add to task-level outcome in Stage 3/4 (verification) | PROPOSED |
+| 10 persistence | User controls to **inspect and delete** task history and preferences | Stage 3 (with persistence work) | PROPOSED |
+| 4.2, 12 asyncio | Stage 1 runner uses worker threads, not asyncio | Deliberate: Qt plus blocking UIA calls suit threads; revisit when browser (Playwright async) arrives in Stage 4 | PROPOSED |
+| 14.5 test status | Use passed / failed / blocked / skipped-with-reason / inconclusive | STATUS.md follows this from now on | PROPOSED |
+| 16 Stage 7 / 8 | Outcome prediction (Stretch, Wk 10) and modalities (deferred) | Already in planner; unchanged, not deleted | VERIFIED (planner text) |
+
+Everything else in spec sections 1 to 23 checked against the planner: no capability is removed; deferred items stay listed as deferred.
