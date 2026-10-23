@@ -1,0 +1,27 @@
+# Environments
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime output (never commit user data, screenshots or logs)
+workspace/
+data/
+logs/
+artifacts/*
+!artifacts/env_audit_raw.txt
+*.png
+*.jpg
+*.sqlite3
+*.db
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+
+# Secrets
+.env
+*.key
