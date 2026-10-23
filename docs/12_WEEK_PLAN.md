@@ -203,6 +203,7 @@ orion/
 | B2 | OCR plus exact/fuzzy text matching only |
 | B3 | Pretrained grounding or detection model, zero-shot, no adaptation |
 | B4 | Simple rule-based fusion of B1 to B3 (no learning) |
+| B5 | Simple visual matching (OpenCV template/feature matching against a reference crop); required by spec 6.6, added 2026-10-24 |
 | P | **Proposed hybrid:** candidate generation from UIA/DOM, OCR boxes and a detector, then a learned re-ranker and calibrated abstention (start with gradient-boosted or logistic features: text similarity, role, position, size, visual embedding similarity; adapt a small model only if VRAM and licences allow) |
 
 **Metrics.** Correct target-selection rate (headline), IoU hit rate at 0.5 and 0.7, precision/recall, accuracy on unseen layouts, abstention quality (precision and recall of abstaining on missing/ambiguous targets), latency, peak RAM and VRAM. Report sample counts and bootstrap confidence intervals. Report per-slice error analysis (control type, theme, scaling, ambiguity).
@@ -290,7 +291,7 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 
 ### Week 8: Stage 6a grounding dataset, annotation protocol, baselines, frozen splits
 - **Goal.** A trustworthy dataset and honest baselines before any model training.
-- **Tasks.** Finalize the protocol in section 5; build the synthetic UI generator (randomized layouts, themes, scaling) with DOM ground truth; capture safe-app screenshots; build a light annotation tool or use an open-source one; double-annotate a subset and compute agreement; split by layout family; **freeze and hash the test set**; implement B1, B2 (OCR bake-off decides the engine), B3, B4; evaluation harness that outputs the metrics and confidence intervals; dataset card.
+- **Tasks.** Finalize the protocol in section 5; build the synthetic UI generator (randomized layouts, themes, scaling) with DOM ground truth; capture safe-app screenshots; build a light annotation tool or use an open-source one; double-annotate a subset and compute agreement; split by layout family; **freeze and hash the test set**; implement B1, B2 (OCR bake-off decides the engine), B3, B4, B5; evaluation harness that outputs the metrics and confidence intervals; dataset card.
 - **Deliverables.** Dataset v1 (with provenance), frozen splits, baseline results, evaluation harness, dataset card.
 - **Acceptance.** Splits documented and leak-checked; baselines run end to end; numbers recorded exactly as measured.
 - **Tests.** Split-leakage test (no shared layout family), metric unit tests on toy cases.
