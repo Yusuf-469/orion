@@ -1,0 +1,44 @@
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from orion.config import OrionConfig, load_config
+
+
+def test_defaults_are_safe():
+    cfg = OrionConfig()
+    assert cfg.dry_run_default is True
+    assert cfg.db_path == Path("data") / "orion.db"
+
+
+def test_load_from_file(tmp_path):
+    p = tmp_path / "orion.toml"
+    p.write_text('[orion]\nlog_level = "DEBUG"\nkill_hotkey = "Ctrl + Alt + F12"\n')
+    cfg = load_config(p)
+    assert cfg.log_level == "DEBUG"
+    assert cfg.kill_hotkey == "ctrl+alt+f12"
+
+
+def test_unknown_key_rejected(tmp_path):
+    p = tmp_path / "orion.toml"
+    p.write_text("[orion]\ndry_run_defualt = false\n")
+    with pytest.raises(ValidationError):
+        load_config(p)
+
+
+def test_wrong_type_rejected(tmp_path):
+    p = tmp_path / "orion.toml"
+    p.write_text('[orion]\nsimulated_steps = "many"\n')
+    with pytest.raises(ValidationError):
+        load_config(p)
+
+
+def test_missing_explicit_path_is_error(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_config(tmp_path / "nope.toml")
+
+
+def test_no_file_gives_defaults(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert load_config() == OrionConfig()

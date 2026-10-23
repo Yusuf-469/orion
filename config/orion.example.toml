@@ -1,0 +1,8 @@
+# Copy to ./orion.toml to override defaults. Unknown keys are rejected.
+[orion]
+data_dir = "data"              # logs/ and orion.db live here (gitignored)
+log_level = "INFO"             # DEBUG | INFO | WARNING | ERROR
+dry_run_default = true         # new tasks start in dry-run unless unticked
+kill_hotkey = "ctrl+alt+end"   # global kill switch
+simulated_steps = 10           # Stage 1 only: length of the simulated task
+simulated_step_seconds = 1.0

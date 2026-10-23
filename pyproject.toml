@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orion"
+version = "0.1.0"
+description = "ORION: autonomous Windows computer-use agent (Stage 1 shell)"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6-Essentials>=6.8",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-timeout>=2.3"]
+
+[project.scripts]
+orion = "orion.app.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60
+markers = [
+    "mock: uses simulated actions only, no real desktop/browser control",
+    "real: touches the real desktop (opens an ORION window); no other apps",
+    "safety: safety-critical behaviour (kill switch, dry-run, redaction)",
+    "ui: needs Qt (runs offscreen unless also marked real)",
+]
