@@ -23,7 +23,8 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Dry-run mode (default ON) | verified (mock) | executor never calls actions; steps `skipped`, `started_at` NULL |
 | Error display | implemented-mock | injected-failure test shows red banner |
 | App launch and clean exit | verified | `python -m orion` launched, window "ORION (Stage 1 shell)", WM_CLOSE → exit code 0 (log) |
-| Manual UI checklist M1 to M11 | planned | `docs/stage1_manual_checklist.md`, not yet run by the user |
+| Physical hotkey press engages kill switch | verified (real) | `data/orion.db` event 2026-10-24 01:20:54 "kill switch engaged via hotkey ctrl+alt+end" from the user's key press |
+| Manual UI checklist M1 to M11 | partially verified | User reported "working" 2026-10-24. Evidence in DB: M1 (launch) and the hotkey engaging the switch. No tasks were recorded, so M2 to M6 and M8 to M11 have **no stored evidence**; M7 is only partly shown (switch engaged, but no running task to cancel). |
 | Tool registry, policy engine (Stage 2) | planned | |
 | Planner, task graph, resume (Stage 3) | planned | |
 | UIA / browser perception and verification (Stage 4) | planned | |
