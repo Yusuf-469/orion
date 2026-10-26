@@ -88,6 +88,14 @@ def test_unsupported_requests_are_not_guessed(env, request_text):
     assert "does not understand" in r.message
 
 
+def test_then_inside_text_refuses_whole_request(env):
+    """Documented limitation: 'then' inside file text splits the clause; the leftover is refused."""
+    for text in ('create a file a.txt containing first this then that',
+                 'create a file a.txt containing "first this then that"'):
+        r = tplan(env, text)
+        assert r.status == "unsupported" and r.plan is None
+
+
 def test_out_of_workspace_request_fails_validation(env):
     r = tplan(env, "create a file ..\\evil.txt containing x")
     assert r.status == "invalid"

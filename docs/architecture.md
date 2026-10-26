@@ -64,6 +64,11 @@ goal text ─▶ Planner.propose()  (TemplatePlanner now; LLMPlanner = own tool-
 | `orion.orchestration.graph_runner` | DAG execution, checkpoints, outcomes, resume |
 | `orion.memory` (schema v2) | plans, checkpoints, per-step tool/args/output/action id, task outcome; backs up older DBs before migrating; history delete |
 
+### Known limitations of the template planner (honest)
+- Clauses are split on "then", "and then" and ";" **anywhere**, so text such as `containing first this then that` is split into two clauses; the second ("that") is not understood, so the whole request is refused and nothing runs (tested). Quoting the text does **not** avoid the split yet.
+- Only the phrases in `SUPPORTED_PHRASES` are understood; paraphrases are refused, not guessed. This is the gap the LLM planner (C4) is meant to close and to be measured on.
+- "the original" / "it" refer only to the previous clause's main file.
+
 Outcomes (spec 9): `verified_complete` (all goal checks pass), `partially_complete`, `blocked`, `failed`, `cancelled`, `unverified` (no goal checks: never reported as success), `dry_run`.
 
 ## Planned, mapped onto these seams

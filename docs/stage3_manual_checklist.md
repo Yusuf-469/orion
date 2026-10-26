@@ -9,7 +9,8 @@ Run `C:\ORION\.venv\Scripts\python.exe -m orion` from `C:\ORION`. Hover over the
 | G3 | Goal: `copy notes.txt` | blue box asks "Where should the copy … go?"; no task created |
 | G4 | Goal: `send an email to my boss` | red box: planner does not understand, lists supported phrases; no task |
 | G5 | Goal: `create a file ..\x.txt containing y` | red box: "Plan rejected … outside_workspace"; no task |
-| G6 | Goal: `move notes.txt to archive/notes.txt` (default permissions) | copy done, delete **blocked** → outcome **partially_complete**; source kept |
+| G6a | Goal: `move notes.txt to archive/notes.txt` (default permissions) | red box: "Plan rejected … permission_denied"; **nothing runs** (corrected 2026-10-27: the validator rejects the plan up front) |
+| G6b | Grant `files.delete` in `orion.toml`, restart, same goal, click **No** in the dialog | copy done, delete **blocked** → outcome **partially_complete**; source kept |
 | G7 | Goal: `list files` | outcome **unverified** (no completion checks; never reported as success) |
 | G8 | Start G2-style goal with a new name, then close ORION from Task Manager mid-run (or just observe G9 if too fast) | on restart a yellow banner lists the interrupted task |
 | G9 | Click "Resume (re-observe first)" | completed steps not repeated; outcome shown in the table |
