@@ -38,11 +38,14 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Human-only checks still open | open | M7 physical key press *during a running task* (physical press itself verified Stage 1; handling verified via WM_HOTKEY), M9 visual crispness on 100%/125% monitors. Need the user's eyes; not blocking |
 | Research design revised and merged with `docs/proposal_research_depth.md`: P0 re-ranker vs P1 fine-tuned SigLIP/CLIP scorer (pre-registered selection rule), temperature scaling + conformal abstention, synthetic-to-real research question, own tool-calling loop (Wk 4), learned outcome verifier (Wk 10 stretch) | planned (pre-registration draft) | `docs/12_WEEK_PLAN.md` §5; frozen in Week 8 |
 | Synthetic UI generator (minimal, HTML + ground truth, 6 families, 6 factor switches, abstain cases) | implemented (no rendering yet) | `src/orion/grounding/synth.py`, `tests/unit/test_synth.py` 11 passed. Self-review found a labelling bug (19% of pages had ambiguous "twins" given a single target); fixed + regression test. Sample batch v0: 60 pages, 449 instructions, 95 abstain. Boxes need Playwright rendering (Stage 4) |
-| Stage 3 Week 4 item: LLM planner measured on prompt set v1 | **blocked: needs approval** | local LLM install (Ollama + ~2 GB 3B model) |
+| Stage 3 Week 4 item: LLM planner measured on prompt set v1 | done | see C4 rows above |
+| Plan-review step before running any LLM plan | planned (required before the LLM planner is offered in the app) | finding 4 of the C4 report |
 | Goal/plan schemas + plan validator | verified (unit) | `tests/unit/test_plan_validator.py` 14 passed |
 | Template planner (chaining, clarification, refuses unknown) | verified (unit) | `tests/unit/test_planners.py` |
 | Planner eval on fixed prompt set v1 (24 prompts) | measured | template: behaviour 24/24, plan validation 12/15 of proposed (the 3 rejections are the intended escape/device-name prompts), invalid tool calls 0. `research/planner_eval/result_template_v1.json`, commit e7b2372. **Caveat:** prompts written alongside the templates; a baseline, not evidence of generalization |
-| LLM planner loop (C4) | implemented-mock | fake backends only (hallucinated tool repaired, relabel rejected, garbage counted). **No real model yet**: needs a local LLM install (approval) |
+| LLM planner loop (C4) | implemented-real, measured | Phi-3.5-mini via Ollama (MIT, verified). Constrained, 3 runs at e836e38: behaviour 5/24 each, safe 11/12, exact plan 2/12, 24/24 prompts stable within the session; unconstrained: 0 usable replies. Earlier session: 9-10/24. Full analysis: `research/reports/c4_planner_eval_v1.md`. Verdict: not good enough to plan; containment held in every run |
+| Intent-drift check in validator | verified (unit) | catches invented destinations and rewritten paths (post-hoc: 2 bad + 1 strict catch of 10 accepted LLM plans); cannot catch invented content |
+| Local LLM runtime | installed (approved 2026-10-27) | Ollama 0.40.11 (winget, installer hash verified), loopback only (verified 127.0.0.1:11434), model 2.03 GiB on disk, 3.8 GB VRAM at ctx 4096 |
 | Verifier (read-only checks) | verified | used by every graph test |
 | Graph runner: deps, priority order, checkpoints, outcomes (spec 9), cancel, dry-run of whole plan | verified (real disk, tmp dir) | `tests/integration/test_graph_runner.py` |
 | Crash-safe resume (gate S6) | verified (real crash) | subprocess `os._exit` mid-tool: completed step not repeated; verifiable step "verified after resume"; unverifiable step needs_review, **0 repeats**; read-only step re-run. 3 tests |
@@ -55,10 +58,10 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24, end of session)
-`-m "not real"` offscreen: **180 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
+`-m "not real"` offscreen: **190 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stages 2 and 3 closed except one approval)
-2026-10-27: all Stage 1-3 checklists verified by a scripted real-window acceptance run (24/24, twice); two real bugs fixed. Synthetic generator started. Only open Stage 3 item: real LLM planner measurement, which needs approval to install Ollama + a ~2 GB model. Then Stage 4 (needs approval).
+## RESUME HERE (Stages 1 to 3 closed)
+2026-10-27: all Stage 1-3 checklists verified by a scripted real-window acceptance run (24/24, twice); real-LLM planner measured (C4 baseline). Waiting for approval to start Stage 4 (Windows UIA + browser control). Only human-eye checks remain open (M7 during a task, M9 DPI look).
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.

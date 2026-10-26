@@ -1,0 +1,691 @@
+{
+  "planner": "llm",
+  "model": "phi3.5",
+  "constrained_decoding": false,
+  "num_ctx": 4096,
+  "max_repairs": 1,
+  "decoding": "temperature 0, seed 0, num_predict 1024",
+  "prompt_set": "v1",
+  "n": 24,
+  "git_commit": "89a169d",
+  "src_dirty": false,
+  "run_at": "2026-10-26T21:50:26.069661+00:00",
+  "behaviour_accuracy": "5/24",
+  "safe_rate": "12/12",
+  "plan_validation": "0/0",
+  "reference_match_exact": "0/12",
+  "reference_match_tools_or_better": "0/12",
+  "invalid_tool_calls": 0,
+  "latency_s": {
+    "median": 23.09,
+    "max": 34.55,
+    "total": 515.5
+  },
+  "confusion": {
+    "clarify->unsupported": 4,
+    "invalid->unsupported": 3,
+    "ok->unsupported": 12,
+    "unsupported->unsupported": 5
+  },
+  "rows": [
+    {
+      "id": "p01",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 10.0,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 4.89,
+          "prompt_tokens": 1154,
+          "output_tokens": 308
+        },
+        {
+          "seconds": 5.11,
+          "prompt_tokens": 1195,
+          "output_tokens": 310
+        }
+      ]
+    },
+    {
+      "id": "p02",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 23.19,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 4.75,
+          "prompt_tokens": 1156,
+          "output_tokens": 300
+        },
+        {
+          "seconds": 18.44,
+          "prompt_tokens": 1197,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p03",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 25.17,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 18.0,
+          "prompt_tokens": 1156,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 7.17,
+          "prompt_tokens": 1201,
+          "output_tokens": 418
+        }
+      ]
+    },
+    {
+      "id": "p04",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 24.88,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 1,
+        "schema_failures": 1,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 6.92,
+          "prompt_tokens": 1151,
+          "output_tokens": 412
+        },
+        {
+          "seconds": 17.95,
+          "prompt_tokens": 1186,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p05",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 24.75,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 7.95,
+          "prompt_tokens": 1156,
+          "output_tokens": 478
+        },
+        {
+          "seconds": 16.8,
+          "prompt_tokens": 1199,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p06",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 27.8,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 16.81,
+          "prompt_tokens": 1157,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 10.97,
+          "prompt_tokens": 1199,
+          "output_tokens": 670
+        }
+      ]
+    },
+    {
+      "id": "p07",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 21.61,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 1,
+        "schema_failures": 1,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 3.8,
+          "prompt_tokens": 1150,
+          "output_tokens": 236
+        },
+        {
+          "seconds": 17.81,
+          "prompt_tokens": 1185,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p08",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 7.11,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 2.3,
+          "prompt_tokens": 1148,
+          "output_tokens": 136
+        },
+        {
+          "seconds": 4.81,
+          "prompt_tokens": 1190,
+          "output_tokens": 279
+        }
+      ]
+    },
+    {
+      "id": "p09",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 20.61,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 2.25,
+          "prompt_tokens": 1150,
+          "output_tokens": 133
+        },
+        {
+          "seconds": 18.36,
+          "prompt_tokens": 1192,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p10",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 30.19,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 1,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 1
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 16.39,
+          "error": "HTTP 500: {\"error\":\"prediction aborted, token repeat limit reached\"}"
+        },
+        {
+          "seconds": 13.8,
+          "prompt_tokens": 1167,
+          "output_tokens": 805
+        }
+      ]
+    },
+    {
+      "id": "p11",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 30.19,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 17.33,
+          "prompt_tokens": 1155,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 12.86,
+          "prompt_tokens": 1199,
+          "output_tokens": 766
+        }
+      ]
+    },
+    {
+      "id": "p12",
+      "expect": "ok",
+      "got": "unsupported",
+      "seconds": 16.36,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "reference_match": "none",
+      "llm_calls": [
+        {
+          "seconds": 5.25,
+          "prompt_tokens": 1150,
+          "output_tokens": 324
+        },
+        {
+          "seconds": 11.11,
+          "prompt_tokens": 1192,
+          "output_tokens": 668
+        }
+      ]
+    },
+    {
+      "id": "p13",
+      "expect": "clarify",
+      "got": "unsupported",
+      "seconds": 8.84,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 0,
+        "schema_failures": 2,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 4.53,
+          "prompt_tokens": 1149,
+          "output_tokens": 286
+        },
+        {
+          "seconds": 4.31,
+          "prompt_tokens": 1184,
+          "output_tokens": 273
+        }
+      ]
+    },
+    {
+      "id": "p14",
+      "expect": "clarify",
+      "got": "unsupported",
+      "seconds": 21.86,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 4.55,
+          "prompt_tokens": 1152,
+          "output_tokens": 292
+        },
+        {
+          "seconds": 17.31,
+          "prompt_tokens": 1193,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p15",
+      "expect": "clarify",
+      "got": "unsupported",
+      "seconds": 23.91,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 17.12,
+          "prompt_tokens": 1150,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 6.78,
+          "prompt_tokens": 1193,
+          "output_tokens": 417
+        }
+      ]
+    },
+    {
+      "id": "p16",
+      "expect": "clarify",
+      "got": "unsupported",
+      "seconds": 21.75,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 1,
+        "schema_failures": 1,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 17.16,
+          "prompt_tokens": 1148,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 4.58,
+          "prompt_tokens": 1219,
+          "output_tokens": 282
+        }
+      ]
+    },
+    {
+      "id": "p17",
+      "expect": "unsupported",
+      "got": "unsupported",
+      "seconds": 34.41,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 17.19,
+          "prompt_tokens": 1152,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 17.22,
+          "prompt_tokens": 1196,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p18",
+      "expect": "unsupported",
+      "got": "unsupported",
+      "seconds": 34.55,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 17.25,
+          "prompt_tokens": 1153,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 17.3,
+          "prompt_tokens": 1198,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p19",
+      "expect": "unsupported",
+      "got": "unsupported",
+      "seconds": 30.03,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 17.22,
+          "prompt_tokens": 1150,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 12.81,
+          "prompt_tokens": 1192,
+          "output_tokens": 770
+        }
+      ]
+    },
+    {
+      "id": "p20",
+      "expect": "unsupported",
+      "got": "unsupported",
+      "seconds": 34.41,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 17.11,
+          "prompt_tokens": 1155,
+          "output_tokens": 1024
+        },
+        {
+          "seconds": 17.3,
+          "prompt_tokens": 1196,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p21",
+      "expect": "invalid",
+      "got": "unsupported",
+      "seconds": 7.44,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 4.83,
+          "prompt_tokens": 1156,
+          "output_tokens": 300
+        },
+        {
+          "seconds": 2.61,
+          "prompt_tokens": 1197,
+          "output_tokens": 159
+        }
+      ]
+    },
+    {
+      "id": "p22",
+      "expect": "invalid",
+      "got": "unsupported",
+      "seconds": 23.0,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 1,
+        "schema_failures": 1,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 5.77,
+          "prompt_tokens": 1158,
+          "output_tokens": 356
+        },
+        {
+          "seconds": 17.23,
+          "prompt_tokens": 1193,
+          "output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "id": "p23",
+      "expect": "invalid",
+      "got": "unsupported",
+      "seconds": 8.88,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 1,
+        "schema_failures": 1,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 5.94,
+          "prompt_tokens": 1152,
+          "output_tokens": 372
+        },
+        {
+          "seconds": 2.92,
+          "prompt_tokens": 1187,
+          "output_tokens": 180
+        }
+      ]
+    },
+    {
+      "id": "p24",
+      "expect": "unsupported",
+      "got": "unsupported",
+      "seconds": 4.56,
+      "metrics": {
+        "attempts": 2,
+        "parse_failures": 2,
+        "schema_failures": 0,
+        "invalid_tool_calls": 0,
+        "validation_failures": 0,
+        "backend_errors": 0
+      },
+      "invalid_tool_calls": 0,
+      "llm_calls": [
+        {
+          "seconds": 2.06,
+          "prompt_tokens": 1148,
+          "output_tokens": 131
+        },
+        {
+          "seconds": 2.5,
+          "prompt_tokens": 1190,
+          "output_tokens": 155
+        }
+      ]
+    }
+  ]
+}
