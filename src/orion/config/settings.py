@@ -35,6 +35,10 @@ class OrionConfig(BaseModel):
     granted_permissions: tuple[Permission, ...] = DEFAULT_PERMISSIONS
     # Ask before reversible local changes too (consequential actions always ask).
     confirm_reversible: bool = False
+    # "template" = deterministic phrase planner (default). "llm" = local model via Ollama (loopback only);
+    # every LLM plan must be reviewed by the user before it runs.
+    planner: Literal["template", "llm"] = "template"
+    llm_model: str = "phi3.5"
 
     @field_validator("kill_hotkey")
     @classmethod

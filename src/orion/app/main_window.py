@@ -28,7 +28,7 @@ from orion.orchestration.cancel import KillSwitch, KillSwitchEngaged
 from orion.orchestration.graph_runner import GraphRunner
 from orion.orchestration.runner import TaskRunner, simulated_action
 from orion.orchestration.states import Status
-from orion.planner.service import plan_request
+from orion.planner.service import PlanResult, plan_request
 from orion.planner.template import SUPPORTED_PHRASES, TemplatePlanner
 from orion.policy import PolicyEngine
 from orion.verification import Verifier
@@ -77,6 +77,16 @@ def build_simulated_task(cfg: OrionConfig, inject_failure: bool) -> list[Action]
 
 
 class MainWindow(QMainWindow):
+    _planned = Signal(object)   # (request, PlanResult) from the planner thread
+
+    def _make_planner(self):
+        if self.cfg.planner == "llm":
+            from orion.models.ollama import OllamaBackend
+            from orion.planner.llm import LLMPlanner, output_schema
+            backend = OllamaBackend(model=self.cfg.llm_model, schema=output_schema(), num_ctx=4096)
+            return LLMPlanner(backend, self.registry, self.policy, self.cfg.workspace_dir)
+        return TemplatePlanner()
+
     def __init__(self, cfg: OrionConfig, store: TaskStore, register_hotkey: bool = True):
         super().__init__()
         self.cfg = cfg
@@ -98,7 +108,9 @@ class MainWindow(QMainWindow):
         self.confirmer = QtConfirmer(self)
         self.policy = PolicyEngine(frozenset(cfg.granted_permissions), cfg.confirm_reversible)
         self.tool_runtime = ToolRuntime(self.registry, self.policy, self.confirmer, cfg.workspace_dir)
-        self.planner = TemplatePlanner()
+        self.planner = self._make_planner()
+        self.last_goal_task: int | None = None
+        self._planned.connect(self._on_planned)
         self.graph = GraphRunner(store, self.kill_switch, self.tool_runtime, Verifier(cfg.workspace_dir),
                                  on_event=self._bridge.event.emit)
 
@@ -331,12 +343,57 @@ class MainWindow(QMainWindow):
         self._refresh_tasks()
 
     def start_goal(self) -> int | None:
+        """Plan the goal. Template plans are planned and started here (returns the task id).
+        LLM plans are planned on a worker thread and need the user's review; returns None."""
         request = self.goal_input.text().strip()
         if not request:
             return None
         self.error_label.hide()
         self.info_label.hide()
+        if self.planner.name != "template":
+            self.goal_btn.setEnabled(False)
+            self._show_info(f"Planning with the local model ({self.cfg.llm_model}); this can take ~10 s…")
+
+            def work():
+                try:
+                    res = plan_request(self.planner, request, self.registry, self.policy, self.cfg.workspace_dir)
+                except Exception as e:  # noqa: BLE001 - surface it in the UI
+                    res = PlanResult("unsupported", None, None, [], f"planner error: {type(e).__name__}: {e}",
+                                     self.planner.name)
+                self._planned.emit((request, res))
+
+            threading.Thread(target=work, name="planner", daemon=True).start()
+            return None
         res = plan_request(self.planner, request, self.registry, self.policy, self.cfg.workspace_dir)
+        return self._handle_plan(request, res)
+
+    def _on_planned(self, payload) -> None:
+        if self._closed:
+            return
+        self.goal_btn.setEnabled(True)
+        self.info_label.hide()
+        request, res = payload
+        self.last_goal_task = self._handle_plan(request, res)
+
+    def _review_plan(self, res: PlanResult) -> bool:
+        """Mandatory review for model-made plans: show every step, path and text before anything runs."""
+        lines = []
+        for s in res.plan.steps:
+            after = f"  (after {', '.join(s.depends_on)})" if s.depends_on else ""
+            lines.append(f"{s.id}: {s.tool_id} {json.dumps(s.args, ensure_ascii=False)}{after}")
+        warnings = [str(i) for i in res.issues if i.severity == "warning"]
+        box = QMessageBox(QMessageBox.Question, "Review the plan before it runs",
+                          f"The local model proposed {len(res.plan.steps)} step(s) for:\n\"{res.goal.request}\"\n\n"
+                          + "\n".join(lines), QMessageBox.Yes | QMessageBox.No, self)
+        box.setInformativeText(
+            "Files it may change: " + (", ".join(res.goal.authorized_outputs) or "none") +
+            ("\nWarnings:\n" + "\n".join(warnings) if warnings else "") +
+            "\n\nModels can misread requests. Run this plan?")
+        box.setDefaultButton(QMessageBox.No)
+        box.setObjectName("orion_plan_review")
+        return box.exec() == QMessageBox.Yes
+
+    def _handle_plan(self, request: str, res: PlanResult) -> int | None:
         self._append_log(f"planner '{res.planner}' -> {res.status}: {request}")
         if res.status == "clarify":
             self._show_info("ORION needs more information before planning:\n- " + "\n- ".join(res.questions) +
@@ -350,6 +407,10 @@ class MainWindow(QMainWindow):
         if res.status == "invalid":
             errs = [str(i) for i in res.issues if i.severity == "error"]
             self._show_error("Plan rejected by the validator:\n" + "\n".join(errs))
+            return None
+        if res.planner != "template" and not self._review_plan(res):
+            self._append_log("plan declined by the user at review; nothing was run")
+            self._show_info("Plan declined. Nothing was run.")
             return None
         dry_run = self.dry_run_box.isChecked()
         try:

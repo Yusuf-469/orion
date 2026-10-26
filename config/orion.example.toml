@@ -10,3 +10,5 @@ workspace_dir = "workspace"    # file tools are confined to this folder (gitigno
 # Least privilege. Add "files.delete" to allow deleting (moves to workspace/.orion_trash; always asks first).
 granted_permissions = ["files.read", "files.write", "app.launch"]
 confirm_reversible = false     # true = also ask before creating/copying files or opening apps
+planner = "template"           # "llm" = local model via Ollama (needs `ollama serve`); every plan is reviewed first
+llm_model = "phi3.5"

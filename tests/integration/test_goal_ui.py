@@ -122,6 +122,54 @@ def test_interrupted_task_banner_and_resume(qapp, make_window, tmp_path):
     assert (ws / "a.txt").read_text() == "hi"   # not rewritten
 
 
+def _fake_llm(w, request_file="n.txt", content="hi"):
+    import json as _json
+    from orion.planner.llm import LLMPlanner
+    reply = _json.dumps({"goal": {"objective": "note"},
+                         "plan": {"steps": [{"id": "w", "description": "write", "tool_id": "files.write_new",
+                                             "args": {"path": request_file, "content": content},
+                                             "postconditions": [{"kind": "file_contains", "path": request_file,
+                                                                 "text": content}]}]}})
+    w.planner = LLMPlanner(lambda prompt: reply, w.registry, w.policy, w.cfg.workspace_dir)
+
+
+@pytest.mark.parametrize("accept", [True, False])
+def test_llm_plan_requires_review(qapp, make_window, monkeypatch, accept):
+    w = make_window()
+    _fake_llm(w)
+    reviewed = []
+    monkeypatch.setattr(w, "_review_plan", lambda res: reviewed.append(res) or accept)
+    w.goal_input.setText("make a note n.txt containing hi")
+    assert w.start_goal() is None               # planning happens off the UI thread
+    assert _pump(qapp, 5, until=lambda: reviewed and w.goal_btn.isEnabled())
+    if accept:
+        assert _pump(qapp, 5, until=lambda: w.last_goal_task is not None and
+                     w.store.get_task(w.last_goal_task)["outcome"] is not None)
+        assert w.store.get_task(w.last_goal_task)["outcome"] == "verified_complete"
+        assert (w.cfg.workspace_dir / "n.txt").read_text() == "hi"
+    else:
+        _pump(qapp, 0.3)
+        assert w.store.list_tasks() == [] and not (w.cfg.workspace_dir / "n.txt").exists()
+        assert "declined" in w.info_label.text()
+    assert reviewed[0].planner == "llm"
+
+
+def test_invented_llm_content_never_reaches_review(qapp, make_window, monkeypatch):
+    w = make_window()
+    _fake_llm(w, content="something the user never said")
+    monkeypatch.setattr(w, "_review_plan", lambda res: pytest.fail("invalid plan must not be offered for review"))
+    w.goal_input.setText("make a note n.txt")
+    w.start_goal()
+    assert _pump(qapp, 5, until=lambda: "Plan rejected" in w.error_label.text())
+    assert "intent_drift" in w.error_label.text() and w.store.list_tasks() == []
+
+
+def test_template_plans_do_not_need_review(qapp, make_window, monkeypatch):
+    w = make_window()
+    monkeypatch.setattr(w, "_review_plan", lambda res: pytest.fail("template plans are not reviewed"))
+    assert goal(qapp, w, "list files") is not None
+
+
 def test_history_delete_and_clear(qapp, make_window, monkeypatch):
     w = make_window()
     t1 = goal(qapp, w, "list files")
