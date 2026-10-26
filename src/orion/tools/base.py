@@ -34,6 +34,8 @@ class Permission(StrEnum):
     FILES_WRITE = "files.write"
     FILES_DELETE = "files.delete"
     APP_LAUNCH = "app.launch"
+    APP_CONTROL = "app.control"      # read/write text inside an app window ORION opened
+    BROWSER_READ = "browser.read"    # open allowlisted local pages and read them
 
 
 @dataclass(frozen=True)
