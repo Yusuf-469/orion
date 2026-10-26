@@ -132,15 +132,24 @@ class Scripted:
         return self.replies.pop(0)
 
 
-def llm(env, backend, **kw):
+REQUEST = "make a note n.txt"
+
+
+def llm(env, backend, request=REQUEST, **kw):
     reg, pol, ws = env
-    return plan_request(LLMPlanner(backend, reg, pol, ws, **kw), "make a note", reg, pol, ws)
+    return plan_request(LLMPlanner(backend, reg, pol, ws, **kw), request, reg, pol, ws)
+
+
+def test_llm_invented_path_is_caught_as_intent_drift(env):
+    """The request never names n.txt, so a plan writing it is drift (seen with Phi-3.5, p15)."""
+    r = llm(env, Scripted(json.dumps(good_output()), json.dumps(good_output())), request="make a note")
+    assert r.status == "invalid" and any(i.code == "intent_drift" for i in r.issues)
 
 
 def test_llm_valid_plan_in_fenced_json(env):
     r = llm(env, Scripted("Sure!\n```json\n" + json.dumps(good_output()) + "\n```"))
     assert r.status == "ok" and r.metrics["attempts"] == 1
-    assert r.goal.request == "make a note"
+    assert r.goal.request == REQUEST
 
 
 def test_llm_hallucinated_tool_is_repaired_once(env):
@@ -167,7 +176,7 @@ def test_llm_cannot_change_request_or_goal_link(env):
     out["plan"]["goal_id"] = "someone-else"
     r = llm(env, Scripted(json.dumps(out)))
     assert r.status == "ok"
-    assert r.goal.request == "make a note" and r.plan.goal_id == r.goal.goal_id
+    assert r.goal.request == REQUEST and r.plan.goal_id == r.goal.goal_id
 
 
 def test_llm_garbage_counts_parse_failures(env):

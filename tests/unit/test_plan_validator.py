@@ -21,7 +21,9 @@ def ctx(tmp_path):
 
 
 def goal(**kw):
-    base = dict(goal_id="g1", request="r", objective="o", authorized_outputs=["out"],
+    # The request names every path these tests write, so intent-drift checks stay quiet unless tested.
+    base = dict(goal_id="g1", objective="o", authorized_outputs=["out"],
+                request="out/a.txt out/b.txt elsewhere/a.txt outside/a.txt ..\\a.txt",
                 completion_checks=[FileExists(path="out/a.txt")])
     base.update(kw)
     return Goal(**base)
@@ -156,6 +158,36 @@ def test_missing_info_blocks_plan(ctx):
     plan = Plan(goal_id="g1", steps=[step("l", "files.list", {})])
     errs, _ = errors(plan, goal(missing_info=["Which file?"]), reg, ws)
     assert ("missing_info", None) in errs
+
+
+def test_intent_drift_invented_destination(ctx):
+    """Observed with Phi-3.5 (p15): 'copy report.txt' got an invented destination."""
+    reg, ws = ctx
+    g = goal(request="copy report.txt", authorized_outputs=["copied_report.txt"])
+    plan = Plan(goal_id="g1", steps=[step("c", "files.copy", {"src": "report.txt", "dst": "copied_report.txt"})])
+    assert ("intent_drift", "c") in errors(plan, g, reg, ws)[0]
+
+
+def test_intent_drift_silently_rewritten_path(ctx):
+    """Observed with Phi-3.5 (p21): '..\\escape.txt' was rewritten to 'escape.txt'."""
+    reg, ws = ctx
+    g = goal(request="create a file ..\\escape.txt containing x", authorized_outputs=["escape.txt"])
+    plan = Plan(goal_id="g1", steps=[step("w", "files.write_new", {"path": "escape.txt", "content": "x"})])
+    errs, issues = errors(plan, g, reg, ws)
+    assert ("intent_drift", "w") in errs
+    assert any(i.code == "intent_drift" and i.severity == "warning" for i in issues)
+
+
+def test_intent_named_paths_and_bak_backups_pass(ctx):
+    reg, ws = ctx
+    g = goal(request='back up "my data.csv" then copy a.txt to out/b.txt',
+             authorized_outputs=["my data.csv.bak", "out/b.txt"])
+    plan = Plan(goal_id="g1", steps=[
+        step("b", "files.copy", {"src": "my data.csv", "dst": "my data.csv.bak"}),
+        step("c", "files.copy", {"src": "a.txt", "dst": "out/b.txt"}, ["b"]),
+    ])
+    errs, issues = errors(plan, g, reg, ws)
+    assert errs == set() and not any(i.code == "intent_drift" for i in issues)
 
 
 def test_topo_order_follows_dependencies():

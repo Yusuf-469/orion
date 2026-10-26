@@ -5,6 +5,7 @@ Errors make a plan invalid. Warnings are shown but do not block.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import Any, Literal
@@ -44,6 +45,19 @@ def _norm(p: str) -> str:
 def _authorized(path: str, allowed: list[str]) -> bool:
     n = _norm(path)
     return any(n == _norm(a) or n.startswith(_norm(a) + "/") for a in allowed if _norm(a))
+
+
+_REQ_PATH = re.compile(r'"([^"]+)"|\'([^\']+)\'|([^\s"\']*[\\/.][^\s"\']*\w)')
+
+
+def request_paths(request: str) -> set[str]:
+    """Path-like tokens the user actually typed (quoted strings, or tokens with a dot or slash)."""
+    out = set()
+    for m in _REQ_PATH.finditer(request):
+        tok = next(g for g in m.groups() if g)
+        if "." in tok or "/" in tok or "\\" in tok:
+            out.add(_norm(tok))
+    return out
 
 
 def _check_paths(check) -> list[str]:
@@ -124,11 +138,39 @@ def validate_plan(plan: Plan, goal: Goal, registry: ToolRegistry, policy: Policy
     for s in plan.steps:
         _validate_step(s, goal, registry, policy, workspace, anc, by_id, err, warn)
 
+    _check_intent(plan, goal, registry, err, warn)
+
     for c in goal.completion_checks:
         _validate_check(c, workspace, None, err)
     if not goal.completion_checks:
         warn("no_completion_checks", "goal has no completion checks; success can only be 'unverified'")
     return issues
+
+
+def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> None:
+    """Intent drift: a plan may only change paths the user named (plus '<named>.bak' backups).
+
+    Catches planners (e.g. an LLM) that invent destinations or silently rewrite a path the user
+    typed. It cannot catch invented file *content*; LLM plans still need user review.
+    """
+    named = request_paths(goal.request)
+    used: set[str] = set()
+    for s in plan.steps:
+        for k in ("path", "src", "dst"):
+            v = s.args.get(k)
+            if isinstance(v, str) and parse_ref(v) is None:
+                used.add(_norm(v))
+        if s.tool_id not in registry or registry.get(s.tool_id).spec.side_effect is SideEffect.READ_ONLY:
+            continue
+        for k in WRITE_ARGS:
+            v = s.args.get(k)
+            if not isinstance(v, str) or parse_ref(v) is not None:
+                continue
+            n = _norm(v)
+            if n not in named and not (n.endswith(".bak") and n[:-4] in named):
+                err("intent_drift", f"plan changes {v!r}, which the request never mentions", s.id)
+    for p in sorted(named - used):
+        warn("intent_drift", f"the request mentions {p!r} but the plan never uses it")
 
 
 def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by_id, err, warn) -> None:
