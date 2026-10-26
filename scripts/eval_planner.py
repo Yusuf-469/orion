@@ -71,8 +71,48 @@ def main() -> int:
     ap.add_argument("--constrained", action="store_true")
     ap.add_argument("--num-ctx", type=int, default=4096)
     ap.add_argument("--max-repairs", type=int, default=1)
+    ap.add_argument("--repeats", type=int, default=1, help="run the whole prompt set N times (LLMs are not "
+                                                            "deterministic on GPU even at temperature 0)")
     ap.add_argument("--out")
     a = ap.parse_args()
+    runs = [run_once(a) for _ in range(a.repeats)]
+    report = runs[0] if a.repeats == 1 else aggregate(runs)
+    summary = {k: v for k, v in report.items() if k not in ("rows", "runs")}
+    print(json.dumps(summary, indent=2))
+    if a.out:
+        Path(a.out).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return 0
+
+
+COUNTS = ("behaviour_accuracy", "safe_rate", "plan_validation", "reference_match_exact",
+          "reference_match_tools_or_better")
+
+
+def aggregate(runs: list[dict]) -> dict:
+    """Mean and range of each metric over repeated runs, plus per-prompt outcome stability."""
+    out = {k: runs[0][k] for k in ("planner", "model", "constrained_decoding", "num_ctx", "max_repairs",
+                                   "decoding", "prompt_set", "n", "git_commit", "src_dirty")}
+    out["repeats"] = len(runs)
+    for k in COUNTS:
+        nums = [int(r[k].split("/")[0]) for r in runs]
+        dens = {int(r[k].split("/")[1]) for r in runs}
+        out[k] = {"per_run": [r[k] for r in runs], "mean": round(statistics.mean(nums), 2),
+                  "min": min(nums), "max": max(nums)}
+        if len(dens) == 1:
+            out[k]["of"] = dens.pop()
+    out["invalid_tool_calls_per_run"] = [r["invalid_tool_calls"] for r in runs]
+    by_prompt: dict[str, list[str]] = {}
+    for r in runs:
+        for row in r["rows"]:
+            by_prompt.setdefault(row["id"], []).append(row["got"])
+    unstable = {pid: outs for pid, outs in by_prompt.items() if len(set(outs)) > 1}
+    out["prompt_outcome_stability"] = f"{len(by_prompt) - len(unstable)}/{len(by_prompt)} prompts identical in all runs"
+    out["unstable_prompts"] = unstable
+    out["runs"] = runs
+    return out
+
+
+def run_once(a) -> dict:
     data = json.loads(Path(a.prompts).read_text(encoding="utf-8"))
     reg, pol = build_registry(), PolicyEngine(frozenset(Permission))
     template = TemplatePlanner()
@@ -136,11 +176,7 @@ def main() -> int:
         "confusion": {f"{e}->{g}": c for (e, g), c in sorted(confusion.items())},
         "rows": rows,
     }
-    summary = {k: v for k, v in report.items() if k != "rows"}
-    print(json.dumps(summary, indent=2))
-    if a.out:
-        Path(a.out).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return 0
+    return report
 
 
 if __name__ == "__main__":
