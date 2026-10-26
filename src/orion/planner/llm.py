@@ -14,9 +14,11 @@ import re
 from pathlib import Path
 from typing import Callable
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from orion.planner.schemas import Goal, Plan
+from orion.planner.schemas import Check, Constraints, Goal, Plan, PlanStep
 from orion.planner.service import Proposal
 from orion.planner.validator import validate_plan
 from orion.policy.engine import PolicyEngine
@@ -29,6 +31,34 @@ class _ModelOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     goal: dict
     plan: dict
+
+
+class _LLMGoal(BaseModel):
+    """The goal fields a model may fill (request and goal id are set by ORION)."""
+    model_config = ConfigDict(extra="forbid")
+    objective: str
+    constraints: Constraints = Constraints()
+    deliverables: list[str] = []
+    authorized_outputs: list[str] = []
+    completion_checks: list[Check] = []
+    risk: Literal["low", "medium", "high"] = "low"
+    missing_info: list[str] = []
+
+
+class _LLMPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    steps: list[PlanStep]
+
+
+class _LLMReply(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    goal: _LLMGoal
+    plan: _LLMPlan
+
+
+def output_schema() -> dict:
+    """JSON schema for constrained decoding of the model's reply."""
+    return _LLMReply.model_json_schema()
 
 
 def extract_json(text: str) -> dict:
@@ -84,11 +114,19 @@ class LLMPlanner:
             metrics["attempts"] += 1
             raw = self.backend(prompt)
             try:
-                out = _ModelOutput.model_validate(extract_json(raw))
-            except (ValueError, ValidationError) as e:
+                data = extract_json(raw)
+            except ValueError as e:
                 metrics["parse_failures"] += 1
                 last_error = f"could not parse JSON: {e}"
                 prompt += f"\nYour previous reply was rejected: {last_error}. Reply with valid JSON only."
+                continue
+            try:
+                out = _ModelOutput.model_validate(data)
+            except ValidationError as e:
+                metrics["schema_failures"] += 1
+                last_error = "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors()[:5])
+                prompt += (f"\nYour previous reply had the wrong shape: {last_error}. "
+                           'It must be {"goal": {...}, "plan": {"steps": [...]}}.')
                 continue
             try:
                 # The model cannot change who asked for what or which goal the plan belongs to.

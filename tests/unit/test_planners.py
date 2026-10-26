@@ -175,6 +175,12 @@ def test_llm_garbage_counts_parse_failures(env):
     assert r.status == "unsupported" and r.metrics["parse_failures"] == 2
 
 
+def test_llm_wrong_shape_is_schema_failure_not_parse_failure(env):
+    shaped_wrong = json.dumps({"goal": {"objective": "x"}, "plan": [{"id": "a"}]})
+    r = llm(env, Scripted(shaped_wrong, shaped_wrong))
+    assert r.metrics["parse_failures"] == 0 and r.metrics["schema_failures"] == 2
+
+
 def test_llm_unknown_fields_rejected(env):
     out = good_output()
     out["plan"]["steps"][0]["side_effect"] = "read_only"   # relabel attempt
