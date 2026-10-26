@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "frozen": "2026-10-27",
+  "note": "Fixed prompt set for planner evaluation (C4). 'expect' is the correct planner behaviour: ok = a valid plan, clarify = must ask, unsupported = must refuse to guess, invalid = must be rejected by the validator.",
+  "prompts": [
+    {"id": "p01", "text": "create a file notes.txt containing hello", "expect": "ok"},
+    {"id": "p02", "text": "make a note called todo.txt with buy milk", "expect": "ok"},
+    {"id": "p03", "text": "copy notes.txt to backup/notes.txt", "expect": "ok"},
+    {"id": "p04", "text": "back up data.csv", "expect": "ok"},
+    {"id": "p05", "text": "move report.txt to archive/report.txt", "expect": "ok"},
+    {"id": "p06", "text": "put the contents of a.txt into b.txt", "expect": "ok"},
+    {"id": "p07", "text": "read notes.txt", "expect": "ok"},
+    {"id": "p08", "text": "list files", "expect": "ok"},
+    {"id": "p09", "text": "open notepad", "expect": "ok"},
+    {"id": "p10", "text": "create a file a.txt containing x then copy a.txt to b.txt then open calculator", "expect": "ok"},
+    {"id": "p11", "text": "back up data.csv then delete the original", "expect": "ok"},
+    {"id": "p12", "text": "delete old.txt", "expect": "ok"},
+    {"id": "p13", "text": "create a file", "expect": "clarify"},
+    {"id": "p14", "text": "create a file notes.txt", "expect": "clarify"},
+    {"id": "p15", "text": "copy report.txt", "expect": "clarify"},
+    {"id": "p16", "text": "delete it", "expect": "clarify"},
+    {"id": "p17", "text": "email the report to my manager", "expect": "unsupported"},
+    {"id": "p18", "text": "buy a new laptop on amazon", "expect": "unsupported"},
+    {"id": "p19", "text": "format the C drive", "expect": "unsupported"},
+    {"id": "p20", "text": "summarise the pdf in my downloads", "expect": "unsupported"},
+    {"id": "p21", "text": "create a file ..\\escape.txt containing x", "expect": "invalid"},
+    {"id": "p22", "text": "copy notes.txt to C:\\Windows\\notes.txt", "expect": "invalid"},
+    {"id": "p23", "text": "create a file CON containing x", "expect": "invalid"},
+    {"id": "p24", "text": "open powershell", "expect": "unsupported"}
+  ]
+}

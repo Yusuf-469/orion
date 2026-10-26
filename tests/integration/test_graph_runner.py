@@ -183,6 +183,11 @@ def test_v1_database_migrates_and_keeps_history(tmp_path):
     assert store.list_tasks()[0]["title"] == "old"
     assert "outcome" in store.get_task(1)
     store.close()
+    backup = tmp_path / "old.db.v1.bak"
+    assert backup.is_file()
+    con = sqlite3.connect(backup)
+    assert con.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == "1"
+    con.close()
 
 
 def test_history_delete(env):

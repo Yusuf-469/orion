@@ -1,4 +1,5 @@
-"""Desktop shell: task input, tool console, task list, live log, kill switch, dry-run."""
+"""Desktop shell: goal input (plan → validate → run), tool console, task list, live log,
+kill switch, dry-run, resume of interrupted tasks, history controls."""
 
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
-    QPlainTextEdit, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QMessageBox, QPlainTextEdit, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from orion.app import hotkey
@@ -24,8 +25,13 @@ from orion.execution.runtime import ToolCall, ToolRuntime
 from orion.execution.tool_action import tool_action
 from orion.memory import TaskStore
 from orion.orchestration.cancel import KillSwitch, KillSwitchEngaged
+from orion.orchestration.graph_runner import GraphRunner
 from orion.orchestration.runner import TaskRunner, simulated_action
+from orion.orchestration.states import Status
+from orion.planner.service import plan_request
+from orion.planner.template import SUPPORTED_PHRASES, TemplatePlanner
 from orion.policy import PolicyEngine
+from orion.verification import Verifier
 from orion.tools import ToolRegistry
 from orion.tools.files import file_tools
 from orion.tools.windows.launch import LaunchAppTool
@@ -92,11 +98,15 @@ class MainWindow(QMainWindow):
         self.confirmer = QtConfirmer(self)
         self.policy = PolicyEngine(frozenset(cfg.granted_permissions), cfg.confirm_reversible)
         self.tool_runtime = ToolRuntime(self.registry, self.policy, self.confirmer, cfg.workspace_dir)
+        self.planner = TemplatePlanner()
+        self.graph = GraphRunner(store, self.kill_switch, self.tool_runtime, Verifier(cfg.workspace_dir),
+                                 on_event=self._bridge.event.emit)
 
-        self.setWindowTitle("ORION (Stage 2)")
-        self.resize(1000, 700)
+        self.setWindowTitle("ORION (Stage 3)")
+        self.resize(1100, 760)
         self._build_ui()
         self._refresh_tasks()
+        self._check_interrupted()
         if register_hotkey:
             self._register_hotkey()
 
@@ -105,11 +115,49 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         granted = ", ".join(self.cfg.granted_permissions)
         banner = QLabel(
-            f"Stage 2: goals are not interpreted yet. Use the tool console to run one registered tool, "
-            f"or run a simulated task. Files are confined to: {self.cfg.workspace_dir.resolve()}  |  "
-            f"Granted: {granted}")
+            f"Stage 3: goals are planned by the deterministic template planner (no AI model yet), validated, "
+            f"then run. Files are confined to: {self.cfg.workspace_dir.resolve()}  |  Granted: {granted}")
         banner.setWordWrap(True)
         banner.setStyleSheet("background:#fff3cd;color:#664d03;padding:6px;border-radius:4px;")
+
+        self.goal_input = QLineEdit()
+        self.goal_input.setPlaceholderText(
+            'Goal, e.g.: create a file notes.txt containing hello then copy notes.txt to backup/notes.txt')
+        self.goal_input.setToolTip("Supported phrases:\n" + "\n".join(SUPPORTED_PHRASES) +
+                                   "\nChain clauses with 'then'.")
+        self.goal_input.returnPressed.connect(self.start_goal)
+        self.goal_btn = QPushButton("Plan && run")
+        self.goal_btn.clicked.connect(self.start_goal)
+        goal_row = QHBoxLayout()
+        goal_row.addWidget(QLabel("Goal:"))
+        goal_row.addWidget(self.goal_input, 1)
+        goal_row.addWidget(self.goal_btn)
+
+        self.info_label = QLabel()
+        self.info_label.setWordWrap(True)
+        self.info_label.setStyleSheet("background:#e7f1ff;color:#084298;padding:6px;border-radius:4px;")
+        self.info_label.hide()
+
+        self.resume_label = QLabel()
+        self.resume_label.setWordWrap(True)
+        self.resume_label.setStyleSheet("background:#fff3cd;color:#664d03;padding:6px;border-radius:4px;")
+        self.resume_btn = QPushButton("Resume (re-observe first)")
+        self.resume_btn.clicked.connect(self.resume_interrupted)
+        self.resume_row = QWidget()
+        rr = QHBoxLayout(self.resume_row)
+        rr.setContentsMargins(0, 0, 0, 0)
+        rr.addWidget(self.resume_label, 1)
+        rr.addWidget(self.resume_btn)
+        self.resume_row.hide()
+
+        self.delete_btn = QPushButton("Delete selected history")
+        self.delete_btn.clicked.connect(self.delete_selected_history)
+        self.clear_btn = QPushButton("Clear all history")
+        self.clear_btn.clicked.connect(self.clear_history)
+        hist_row = QHBoxLayout()
+        hist_row.addStretch(1)
+        hist_row.addWidget(self.delete_btn)
+        hist_row.addWidget(self.clear_btn)
 
         self.task_input = QLineEdit()
         self.task_input.setPlaceholderText("Simulated task title (text is recorded, not interpreted)")
@@ -172,8 +220,8 @@ class MainWindow(QMainWindow):
         self.error_label.setStyleSheet("background:#f8d7da;color:#842029;padding:6px;border-radius:4px;")
         self.error_label.hide()
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["ID", "Task", "Mode", "Status", "Updated"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["ID", "Task", "Mode", "Status", "Outcome", "Updated"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -191,13 +239,17 @@ class MainWindow(QMainWindow):
 
         root = QVBoxLayout()
         root.addWidget(banner)
+        root.addWidget(self.resume_row)
         root.addLayout(mode_row)
+        root.addLayout(goal_row)
         root.addLayout(tool_row)
         root.addLayout(row)
         root.addWidget(self.stop_btn)
         root.addLayout(ks_row)
+        root.addWidget(self.info_label)
         root.addWidget(self.error_label)
         root.addWidget(split, 1)
+        root.addLayout(hist_row)
         w = QWidget()
         w.setLayout(root)
         self.setCentralWidget(w)
@@ -229,8 +281,8 @@ class MainWindow(QMainWindow):
         tasks = self.store.list_tasks()
         self.table.setRowCount(len(tasks))
         for r, t in enumerate(tasks):
-            vals = [str(t["id"]), t["title"], "dry-run" if t["dry_run"] else "live",
-                    t["status"], datetime.fromtimestamp(t["updated_at"]).strftime("%H:%M:%S")]
+            vals = [str(t["id"]), t["title"], "dry-run" if t["dry_run"] else "live", t["status"],
+                    t.get("outcome") or "", datetime.fromtimestamp(t["updated_at"]).strftime("%H:%M:%S")]
             for c, v in enumerate(vals):
                 item = QTableWidgetItem(v)
                 if c == 3 and v in _STATUS_COLORS:
@@ -269,12 +321,127 @@ class MainWindow(QMainWindow):
         self.error_label.hide()
         task_id = self.runner.create(title, actions, dry_run)
         executor = DryRunExecutor() if dry_run else RealExecutor()
-        th = threading.Thread(target=self.runner.run, args=(task_id, actions, executor, token),
-                              name=f"task-{task_id}", daemon=True)
+        self._start_thread(f"task-{task_id}", self.runner.run, task_id, actions, executor, token)
+        return task_id
+
+    def _start_thread(self, name: str, fn, *args) -> None:
+        th = threading.Thread(target=fn, args=args, name=name, daemon=True)
         self._threads = [t for t in self._threads if t.is_alive()] + [th]
         th.start()
         self._refresh_tasks()
+
+    def start_goal(self) -> int | None:
+        request = self.goal_input.text().strip()
+        if not request:
+            return None
+        self.error_label.hide()
+        self.info_label.hide()
+        res = plan_request(self.planner, request, self.registry, self.policy, self.cfg.workspace_dir)
+        self._append_log(f"planner '{res.planner}' -> {res.status}: {request}")
+        if res.status == "clarify":
+            self._show_info("ORION needs more information before planning:\n- " + "\n- ".join(res.questions) +
+                            "\nRe-enter the goal with the details.")
+            return None
+        if res.status == "unsupported":
+            self._show_error(res.message)
+            return None
+        for i in res.issues:
+            self._append_log(f"  plan {i}")
+        if res.status == "invalid":
+            errs = [str(i) for i in res.issues if i.severity == "error"]
+            self._show_error("Plan rejected by the validator:\n" + "\n".join(errs))
+            return None
+        dry_run = self.dry_run_box.isChecked()
+        try:
+            token = self.kill_switch.new_token()
+        except KillSwitchEngaged as e:
+            self._show_error(str(e))
+            return None
+        task_id = self.graph.create(res.goal, res.plan, res.planner, dry_run)
+        self._start_thread(f"goal-{task_id}", self.graph.run, task_id, token, dry_run)
+        self.goal_input.clear()
         return task_id
+
+    def _check_interrupted(self) -> None:
+        tasks = self.store.interrupted_tasks()
+        if not tasks:
+            self.resume_row.hide()
+            return
+        names = ", ".join(f"#{t['id']} {t['title']}" for t in tasks[:5])
+        self.resume_label.setText(
+            f"{len(tasks)} task(s) were interrupted (ORION closed or crashed mid-run): {names}. "
+            f"Resume re-checks the environment first and never blindly repeats an uncertain action.")
+        self.resume_row.show()
+
+    def resume_interrupted(self) -> None:
+        tasks = self.store.interrupted_tasks()
+        try:
+            token = self.kill_switch.new_token()
+        except KillSwitchEngaged as e:
+            self._show_error(str(e))
+            return
+
+        def work():
+            for t in tasks:
+                if token.is_cancelled:
+                    break
+                if self.store.load_plan(t["id"]) is None:
+                    # Stage 1/2 tasks have no plan to resume from; close them honestly.
+                    if t["status"] == "ready":
+                        self.store.set_task_status(t["id"], Status.RUNNING)
+                    self.store.set_task_status(t["id"], Status.CANCELLED, "interrupted; not resumable (no plan)")
+                    self._bridge.event.emit({"task_id": t["id"], "level": "WARNING", "kind": "not_resumable",
+                                             "message": f"task {t['id']} has no plan; marked cancelled"})
+                    continue
+                try:
+                    self.graph.resume(t["id"], self.kill_switch.new_token())
+                except Exception as e:  # noqa: BLE001 - surface it; never die silently
+                    log.exception("resume failed", extra={"event": {"task_id": t["id"]}})
+                    self._bridge.event.emit({"task_id": t["id"], "level": "ERROR", "kind": "task_failed",
+                                             "message": f"resume of task {t['id']} failed: {type(e).__name__}: {e}"})
+            self.kill_switch.release(token)
+
+        self.resume_row.hide()
+        self._start_thread("resume", work)
+
+    def _ask_yes_no(self, title: str, text: str) -> bool:
+        box = QMessageBox(QMessageBox.Question, title, text, QMessageBox.Yes | QMessageBox.No, self)
+        box.setDefaultButton(QMessageBox.No)
+        return box.exec() == QMessageBox.Yes
+
+    def delete_selected_history(self) -> None:
+        if self._alive_threads():
+            self._show_error("Wait for running tasks to finish before deleting history.")
+            return
+        rows = sorted({i.row() for i in self.table.selectedIndexes()})
+        ids = [int(self.table.item(r, 0).text()) for r in rows]
+        if not ids:
+            self._show_info("Select one or more tasks in the table first.")
+            return
+        if not self._ask_yes_no("Delete history", f"Permanently delete the stored history of task(s) {ids}? "
+                                "Files in the workspace are not touched."):
+            return
+        for i in ids:
+            self.store.delete_task(i)
+        self._append_log(f"history deleted for task(s) {ids}")
+        self._refresh_tasks()
+
+    def clear_history(self) -> None:
+        if self._alive_threads():
+            self._show_error("Wait for running tasks to finish before clearing history.")
+            return
+        if not self._ask_yes_no("Clear all history", "Permanently delete ALL stored task history, plans and "
+                                "events? Files in the workspace and the log file are not touched."):
+            return
+        n = self.store.delete_all_history()
+        self.log_pane.clear()
+        self._append_log(f"history cleared ({n} task(s) deleted)")
+        self._refresh_tasks()
+
+    def _show_info(self, text: str) -> None:
+        self.info_label.setText(text)
+        self.info_label.show()
+        self._append_log(f"INFO: {text}")
 
     def engage_kill_switch(self, source: str) -> None:
         self.kill_switch.engage(source)
@@ -304,8 +471,13 @@ class MainWindow(QMainWindow):
         if self._closed:  # events queued before close may arrive after the store is closed
             return
         self._append_log(f"[task {e['task_id']}] {e['level']:<7} {e['message']}")
-        if e["kind"] in ("task_failed", "step_failed", "task_blocked"):
+        if e["kind"] in ("task_failed", "step_failed", "task_blocked", "resume_needs_review"):
             self._show_error(e["message"])
+        elif e["kind"] == "task_outcome":
+            if e.get("outcome") in ("verified_complete", "dry_run"):
+                self._show_info(e["message"])
+            else:
+                self._show_error(e["message"])
         self._refresh_tasks()
 
     # --- hotkey and lifecycle ------------------------------------------------

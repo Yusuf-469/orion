@@ -78,10 +78,33 @@ _V2_COLUMNS = {
 }
 
 
+def _backup_if_old(path: Path) -> None:
+    """Before migrating an older database, keep a copy next to it (orion.db.v1.bak)."""
+    if not path.is_file():
+        return
+    con = sqlite3.connect(str(path))
+    try:
+        row = con.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    except sqlite3.DatabaseError:
+        row = None
+    finally:
+        con.close()
+    if row is None or int(row[0]) >= SCHEMA_VERSION:
+        return
+    backup = path.with_name(f"{path.name}.v{row[0]}.bak")
+    if not backup.exists():
+        src, dst = sqlite3.connect(str(path)), sqlite3.connect(str(backup))
+        with dst:
+            src.backup(dst)
+        src.close()
+        dst.close()
+
+
 class TaskStore:
     def __init__(self, path: Path | str):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+            _backup_if_old(Path(path))
         self._conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
         self._lock = threading.RLock()
