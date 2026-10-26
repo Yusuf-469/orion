@@ -26,6 +26,8 @@ _ALLOWED: dict[Status, frozenset[Status]] = {
     Status.RUNNING: frozenset({
         Status.SUCCEEDED, Status.FAILED, Status.CANCELLED, Status.SKIPPED,
         Status.WAITING_FOR_USER, Status.BLOCKED, Status.NEEDS_REVIEW,
+        # Resume only: an interrupted READ-ONLY step may be safely re-run.
+        Status.READY,
     }),
     Status.WAITING_FOR_USER: frozenset({Status.RUNNING, Status.CANCELLED}),
     Status.BLOCKED: frozenset({Status.READY, Status.FAILED, Status.CANCELLED}),
