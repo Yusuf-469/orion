@@ -47,6 +47,13 @@ class OllamaBackend:
             raise LLMBackendError(f"model {self.model!r} is not installed (have: {sorted(names)})")
         return version
 
+    def unload(self) -> None:
+        """Unload the model from GPU memory (keep_alive 0); the next call loads it fresh."""
+        req = urllib.request.Request(f"{self.url}/api/generate", headers={"Content-Type": "application/json"},
+                                     data=json.dumps({"model": self.model, "keep_alive": 0}).encode())
+        with urllib.request.urlopen(req, timeout=30) as r:
+            r.read()
+
     def __call__(self, prompt: str) -> str:
         body: dict[str, Any] = {
             "model": self.model, "prompt": prompt, "stream": False,

@@ -73,9 +73,17 @@ def main() -> int:
     ap.add_argument("--max-repairs", type=int, default=1)
     ap.add_argument("--repeats", type=int, default=1, help="run the whole prompt set N times (LLMs are not "
                                                             "deterministic on GPU even at temperature 0)")
+    ap.add_argument("--reload-between", action="store_true",
+                    help="unload the model before every repeat, to test whether reloads cause run-to-run variation")
     ap.add_argument("--out")
     a = ap.parse_args()
-    runs = [run_once(a) for _ in range(a.repeats)]
+    runs = []
+    for i in range(a.repeats):
+        if a.reload_between and a.planner == "llm":
+            from orion.models.ollama import OllamaBackend
+            OllamaBackend(model=a.model).unload()
+            print(f"--- repeat {i + 1}: model unloaded, will load fresh", flush=True)
+        runs.append(run_once(a))
     report = runs[0] if a.repeats == 1 else aggregate(runs)
     summary = {k: v for k, v in report.items() if k not in ("rows", "runs")}
     print(json.dumps(summary, indent=2))
@@ -93,6 +101,7 @@ def aggregate(runs: list[dict]) -> dict:
     out = {k: runs[0][k] for k in ("planner", "model", "constrained_decoding", "num_ctx", "max_repairs",
                                    "decoding", "llm_prompt_version", "prompt_set", "n", "git_commit", "src_dirty")}
     out["repeats"] = len(runs)
+    out["reload_between_repeats"] = runs[0].get("reload_between", False)
     for k in COUNTS:
         nums = [int(r[k].split("/")[0]) for r in runs]
         dens = {int(r[k].split("/")[1]) for r in runs}
@@ -174,6 +183,7 @@ def run_once(a) -> dict:
         "decoding": f"temperature 0, seed 0, num_predict {backend.num_predict}" if backend else "deterministic",
         "llm_prompt_version": __import__("orion.planner.llm", fromlist=["x"]).PROMPT_VERSION if backend else None,
         "prompt_set": data["version"], "n": n, "git_commit": commit, "src_dirty": dirty,
+        "reload_between": bool(getattr(a, "reload_between", False)),
         "run_at": datetime.now(timezone.utc).isoformat(),
         "behaviour_accuracy": f"{sum(r['expect'] == r['got'] for r in rows)}/{n}",
         "safe_rate": f"{sum(r['got'] != 'ok' for r in must_not_run)}/{len(must_not_run)}",
