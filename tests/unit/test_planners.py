@@ -150,7 +150,7 @@ def test_llm_hallucinated_tool_is_repaired_once(env):
     r = llm(env, backend)
     assert r.status == "ok"
     assert r.metrics == {"attempts": 2, "parse_failures": 0, "schema_failures": 0,
-                         "invalid_tool_calls": 1, "validation_failures": 1}
+                         "invalid_tool_calls": 1, "validation_failures": 1, "backend_errors": 0}
     assert "unknown_tool" in backend.prompts[1]
 
 
@@ -186,6 +186,24 @@ def test_llm_unknown_fields_rejected(env):
     out["plan"]["steps"][0]["side_effect"] = "read_only"   # relabel attempt
     r = llm(env, Scripted(json.dumps(out), json.dumps(out)))
     assert r.status in ("unsupported", "invalid") and r.metrics["schema_failures"] == 2
+
+
+def test_llm_backend_error_is_a_failed_attempt_not_a_crash(env):
+    from orion.models.ollama import LLMBackendError
+
+    def aborting(prompt):
+        raise LLMBackendError('HTTP 500: {"error":"prediction aborted, token repeat limit reached"}')
+
+    r = llm(env, aborting)
+    assert r.status == "unsupported" and r.metrics["backend_errors"] == 2 and r.plan is None
+
+
+def test_ollama_backend_refuses_remote_hosts():
+    from orion.models.ollama import OllamaBackend
+    for url in ("http://example.com:11434", "http://10.0.0.5:11434", "https://api.example.org"):
+        with pytest.raises(ValueError):
+            OllamaBackend(url=url)
+    OllamaBackend(url="http://localhost:11434")
 
 
 def test_extract_json():

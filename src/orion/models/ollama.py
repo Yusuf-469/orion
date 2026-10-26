@@ -10,11 +10,16 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.error
 import urllib.request
 from typing import Any
 from urllib.parse import urlparse
 
 _LOCAL = {"127.0.0.1", "localhost", "::1"}
+
+
+class LLMBackendError(RuntimeError):
+    """The model server refused or aborted a generation (e.g. a repetition loop)."""
 
 
 class OllamaBackend:
@@ -37,8 +42,13 @@ class OllamaBackend:
         req = urllib.request.Request(f"{self.url}/api/generate", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
         t0 = time.monotonic()
-        with urllib.request.urlopen(req, timeout=self.timeout_s) as r:
-            data = json.loads(r.read())
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as r:
+                data = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:300]
+            self.calls.append({"seconds": round(time.monotonic() - t0, 2), "error": f"HTTP {e.code}: {detail}"})
+            raise LLMBackendError(f"HTTP {e.code}: {detail}") from None
         self.calls.append({"seconds": round(time.monotonic() - t0, 2),
                            "prompt_tokens": data.get("prompt_eval_count"), "output_tokens": data.get("eval_count")})
         return data.get("response", "")

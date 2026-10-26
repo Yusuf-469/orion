@@ -106,13 +106,18 @@ class LLMPlanner:
 
     def propose(self, request: str) -> Proposal:
         metrics = {"attempts": 0, "parse_failures": 0, "schema_failures": 0, "invalid_tool_calls": 0,
-                   "validation_failures": 0}
+                   "validation_failures": 0, "backend_errors": 0}
         prompt = build_prompt(request, self.registry)
         last_error = "no attempt"
         goal = plan = None
         for _ in range(self.max_repairs + 1):
             metrics["attempts"] += 1
-            raw = self.backend(prompt)
+            try:
+                raw = self.backend(prompt)
+            except RuntimeError as e:   # backend refused/aborted (e.g. repetition loop): a failed attempt
+                metrics["backend_errors"] += 1
+                last_error = f"model backend error: {e}"
+                continue
             try:
                 data = extract_json(raw)
             except ValueError as e:
