@@ -1,0 +1,217 @@
+"""Plan validation (spec 5.3): nothing from a planner runs until this passes.
+
+Errors make a plan invalid. Warnings are shown but do not block.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path, PureWindowsPath
+from typing import Any, Literal
+
+from pydantic import ValidationError
+
+from orion.planner.schemas import (
+    FileAbsent, FileContains, FileExists, FilesIdentical, Goal, Plan, PlanStep, parse_ref,
+)
+from orion.policy.engine import Decision, PolicyEngine
+from orion.tools.base import SideEffect
+from orion.tools.errors import ToolError
+from orion.tools.files.workspace import resolve_in_workspace
+from orion.tools.registry import ToolRegistry
+
+# Arguments that name something a non-read-only tool changes.
+WRITE_ARGS = ("path", "dst")
+_DUMMY = {str: "x", int: 0, float: 0.0, bool: False}
+
+
+@dataclass(frozen=True)
+class PlanIssue:
+    severity: Literal["error", "warning"]
+    code: str
+    message: str
+    step_id: str | None = None
+
+    def __str__(self) -> str:
+        where = f"[{self.step_id}] " if self.step_id else ""
+        return f"{self.severity}: {self.code}: {where}{self.message}"
+
+
+def _norm(p: str) -> str:
+    return PureWindowsPath(p).as_posix().strip("/").lower()
+
+
+def _authorized(path: str, allowed: list[str]) -> bool:
+    n = _norm(path)
+    return any(n == _norm(a) or n.startswith(_norm(a) + "/") for a in allowed if _norm(a))
+
+
+def _check_paths(check) -> list[str]:
+    if isinstance(check, (FileExists, FileAbsent, FileContains)):
+        return [check.path]
+    if isinstance(check, FilesIdentical):
+        return [check.a, check.b]
+    return []
+
+
+def topo_order(plan: Plan) -> list[str] | None:
+    """Kahn's algorithm in plan order. None if there is a cycle."""
+    ids = [s.id for s in plan.steps]
+    indeg = {i: 0 for i in ids}
+    children: dict[str, list[str]] = {i: [] for i in ids}
+    for s in plan.steps:
+        for d in s.depends_on:
+            if d in indeg:
+                indeg[s.id] += 1
+                children[d].append(s.id)
+    ready = [i for i in ids if indeg[i] == 0]
+    order: list[str] = []
+    while ready:
+        n = ready.pop(0)
+        order.append(n)
+        for c in children[n]:
+            indeg[c] -= 1
+            if indeg[c] == 0:
+                ready.append(c)
+    return order if len(order) == len(ids) else None
+
+
+def ancestors(plan: Plan) -> dict[str, set[str]]:
+    by_id = {s.id: s for s in plan.steps}
+    memo: dict[str, set[str]] = {}
+
+    def visit(i: str, stack: frozenset[str]) -> set[str]:
+        if i in memo:
+            return memo[i]
+        out: set[str] = set()
+        for d in by_id[i].depends_on:
+            if d in by_id and d not in stack:
+                out |= {d} | visit(d, stack | {d})
+        memo[i] = out
+        return out
+
+    return {s.id: visit(s.id, frozenset({s.id})) for s in plan.steps}
+
+
+def validate_plan(plan: Plan, goal: Goal, registry: ToolRegistry, policy: PolicyEngine,
+                  workspace: Path) -> list[PlanIssue]:
+    issues: list[PlanIssue] = []
+    err = lambda code, msg, sid=None: issues.append(PlanIssue("error", code, msg, sid))  # noqa: E731
+    warn = lambda code, msg, sid=None: issues.append(PlanIssue("warning", code, msg, sid))  # noqa: E731
+
+    if plan.goal_id != goal.goal_id:
+        err("goal_mismatch", f"plan is for goal {plan.goal_id}, not {goal.goal_id}")
+    for q in goal.missing_info:
+        err("missing_info", f"needs an answer first: {q}")
+
+    ids = [s.id for s in plan.steps]
+    dupes = {i for i in ids if ids.count(i) > 1}
+    for d in sorted(dupes):
+        err("duplicate_step", f"step id {d!r} used more than once", d)
+    known = set(ids)
+    for s in plan.steps:
+        for d in s.depends_on:
+            if d == s.id:
+                err("self_dependency", "step depends on itself", s.id)
+            elif d not in known:
+                err("unknown_dependency", f"depends on missing step {d!r}", s.id)
+    if not dupes and topo_order(plan) is None:
+        err("cycle", "dependencies contain a cycle")
+        return issues   # ancestor analysis below assumes a DAG
+    anc = ancestors(plan) if not dupes else {s.id: set() for s in plan.steps}
+    by_id = {s.id: s for s in plan.steps}
+
+    for s in plan.steps:
+        _validate_step(s, goal, registry, policy, workspace, anc, by_id, err, warn)
+
+    for c in goal.completion_checks:
+        _validate_check(c, workspace, None, err)
+    if not goal.completion_checks:
+        warn("no_completion_checks", "goal has no completion checks; success can only be 'unverified'")
+    return issues
+
+
+def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by_id, err, warn) -> None:
+    if s.tool_id not in registry:
+        err("unknown_tool", f"no registered tool {s.tool_id!r}", s.id)
+        return
+    spec = registry.get(s.tool_id).spec
+
+    # References must point at an ancestor's real output field.
+    probe: dict[str, Any] = {}
+    for k, v in s.args.items():
+        ref = parse_ref(v)
+        if ref is None:
+            probe[k] = v
+            continue
+        src_id, field = ref
+        if src_id not in by_id:
+            err("bad_reference", f"argument {k!r} refers to unknown step {src_id!r}", s.id)
+            continue
+        if src_id not in anc[s.id]:
+            err("bad_reference", f"argument {k!r} uses {src_id!r}, which is not a dependency", s.id)
+            continue
+        src_tool = by_id[src_id].tool_id
+        if src_tool not in registry:
+            continue
+        out_fields = registry.get(src_tool).spec.output_model.model_fields
+        if field not in out_fields:
+            err("bad_reference", f"{src_tool} has no output field {field!r}", s.id)
+            continue
+        dummy = _DUMMY.get(out_fields[field].annotation)
+        if dummy is None:
+            err("bad_reference", f"output field {field!r} is not a simple value", s.id)
+            continue
+        if spec.side_effect is not SideEffect.READ_ONLY and k in WRITE_ARGS:
+            err("unchecked_write_target", f"argument {k!r} of a changing step must be a literal path", s.id)
+        probe[k] = dummy
+
+    try:
+        spec.input_model.model_validate(probe)
+    except ValidationError as e:
+        msgs = "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors()[:3])
+        err("invalid_args", msgs, s.id)
+
+    d = policy.decide(spec)
+    if d.decision is Decision.DENY:
+        err("permission_denied", d.reason, s.id)
+
+    if spec.side_effect is not SideEffect.READ_ONLY:
+        for k in WRITE_ARGS:
+            v = s.args.get(k)
+            if isinstance(v, str) and parse_ref(v) is None:
+                try:
+                    resolve_in_workspace(workspace, v)
+                except ToolError as e:
+                    err("outside_workspace", e.message, s.id)
+                    continue
+                if not _authorized(v, goal.authorized_outputs):
+                    err("unauthorized_output", f"{k}={v!r} is not in the goal's authorized outputs", s.id)
+
+    c = goal.constraints
+    if s.tool_id == "files.delete" and (c.preserve_source_files or not c.allow_delete):
+        err("contradiction", "goal says source files must be preserved / deletion not allowed", s.id)
+    if s.tool_id == "app.launch" and not c.allow_app_launch:
+        err("contradiction", "goal does not allow launching apps", s.id)
+
+    if spec.side_effect is SideEffect.CONSEQUENTIAL and not s.checkpoint_before:
+        err("missing_checkpoint", "consequential step needs checkpoint_before=true", s.id)
+    if spec.side_effect is SideEffect.REVERSIBLE:
+        for a in anc[s.id]:
+            a_tool = by_id[a].tool_id
+            if a_tool in registry and registry.get(a_tool).spec.side_effect is SideEffect.CONSEQUENTIAL:
+                warn("irreversible_first", f"depends on consequential step {a!r}; prefer reversible steps first",
+                     s.id)
+
+    for chk in s.postconditions:
+        _validate_check(chk, workspace, s.id, err)
+    if spec.side_effect is not SideEffect.READ_ONLY and not s.postconditions:
+        warn("no_postconditions", "changing step has no postconditions; tool evidence only", s.id)
+
+
+def _validate_check(check, workspace: Path, sid: str | None, err) -> None:
+    for p in _check_paths(check):
+        try:
+            resolve_in_workspace(workspace, p)
+        except ToolError as e:
+            err("invalid_check", e.message, sid)
