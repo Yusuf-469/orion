@@ -62,8 +62,16 @@ class _LLMReply(BaseModel):
 
 
 def output_schema() -> dict:
-    """JSON schema for constrained decoding of the model's reply."""
-    return _LLMReply.model_json_schema()
+    """JSON schema for constrained decoding of the model's reply.
+
+    Check models give `kind` a default, so Pydantic leaves it out of "required"; constrained decoding
+    then lets the model omit it and the discriminated union cannot be parsed. Mark it required here.
+    """
+    schema = _LLMReply.model_json_schema()
+    for d in schema.get("$defs", {}).values():
+        if "kind" in d.get("properties", {}):
+            d["required"] = sorted(set(d.get("required", [])) | {"kind"})
+    return schema
 
 
 def extract_json(text: str) -> dict:

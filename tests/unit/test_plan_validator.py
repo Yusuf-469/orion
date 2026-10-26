@@ -190,6 +190,16 @@ def test_intent_drift_invented_content(ctx):
     assert errors(ok, g2, reg, ws)[0] == set()
 
 
+def test_empty_content_needs_explicit_request(ctx):
+    """Observed with Phi-3.5 (dev d11): content '' slipped past the substring check."""
+    reg, ws = ctx
+    g = goal(request="write something nice into poem.txt", authorized_outputs=["poem.txt"])
+    plan = Plan(goal_id="g1", steps=[step("w", "files.write_new", {"path": "poem.txt", "content": ""})])
+    assert ("intent_drift", "w") in errors(plan, g, reg, ws)[0]
+    g2 = goal(request="create an empty file poem.txt", authorized_outputs=["poem.txt"])
+    assert errors(plan, g2, reg, ws)[0] == set()
+
+
 def test_intent_named_paths_and_bak_backups_pass(ctx):
     reg, ws = ctx
     g = goal(request='back up "my data.csv" then copy a.txt to out/b.txt',

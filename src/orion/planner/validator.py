@@ -176,8 +176,12 @@ def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> 
     req = _squash(goal.request)
     for s in plan.steps:
         v = s.args.get("content")
-        if s.tool_id == "files.write_new" and isinstance(v, str) and parse_ref(v) is None and _squash(v) not in req:
-            err("intent_drift", "file content does not come from the request (invented text)", s.id)
+        if s.tool_id == "files.write_new" and isinstance(v, str) and parse_ref(v) is None:
+            if not v.strip() and "empty" not in req:
+                # '' is a substring of everything; an empty file must be asked for explicitly.
+                err("intent_drift", "file content is empty but the request did not ask for an empty file", s.id)
+            elif _squash(v) not in req:
+                err("intent_drift", "file content does not come from the request (invented text)", s.id)
 
 
 def _squash(text: str) -> str:

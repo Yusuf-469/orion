@@ -256,6 +256,14 @@ def test_prompt_examples_do_not_leak_eval_prompts():
             assert not any(name in t for t in texts)
 
 
+def test_output_schema_requires_check_kind():
+    """Regression: constrained decoding let the model omit 'kind', which then failed to parse."""
+    from orion.planner.llm import output_schema
+    defs = output_schema()["$defs"]
+    for name in ("FileExists", "FileAbsent", "FileContains", "FilesIdentical", "AppWindowOpen"):
+        assert "kind" in defs[name]["required"], name
+
+
 def test_extract_json():
     assert extract_json('noise {"a": 1} tail') == {"a": 1}
     with pytest.raises(ValueError):
