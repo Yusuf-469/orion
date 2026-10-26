@@ -33,7 +33,8 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | UI tool console and confirmation dialog (kill switch closes it) | implemented-mock (offscreen) | `tests/integration/test_tool_console.py` |
 | Stage 2 docs: `docs/tools-and-permissions.md`, architecture v2, safety-and-privacy v2 | implemented | 2026-10-27 |
 | Stage 2 manual checklist T1 to T9 | planned | `docs/stage2_manual_checklist.md`, waiting for the user |
-| Research design revised: fine-tuned SigLIP/CLIP scorer + conformal abstention; re-ranker → baseline B6 | planned (pre-registration draft) | commit 910754c; frozen in Week 8 |
+| Research design revised and merged with `docs/proposal_research_depth.md`: P0 re-ranker vs P1 fine-tuned SigLIP/CLIP scorer (pre-registered selection rule), temperature scaling + conformal abstention, synthetic-to-real research question, own tool-calling loop (Wk 4), learned outcome verifier (Wk 10 stretch) | planned (pre-registration draft) | `docs/12_WEEK_PLAN.md` §5; frozen in Week 8 |
+| Synthetic UI generator, background track Weeks 4 to 7 | planned | starts with Stage 3 |
 | Planner, task graph, resume (Stage 3) | planned | |
 | UIA / browser perception and verification (Stage 4) | planned | |
 | Recovery (Stage 5) | planned | |

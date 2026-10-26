@@ -183,7 +183,7 @@ orion/
 
 ## 5. Pre-registered research experiment: hybrid UI visual grounding (PROPOSED; freeze in Week 8, before any tuning)
 
-> **Revised 2026-10-27 (user-approved):** the proposed method P is now a hybrid candidate generator plus a **fine-tuned SigLIP/CLIP-sized scorer** with **conformal abstention**. The earlier gradient-boosted feature re-ranker becomes baseline B6 and the fallback if fine-tuning is cut. A generative VLM (ShowUI/UI-TARS/Qwen2-VL-2B) was considered and rejected as the main method: too tight for ~6 GB free VRAM, slow to iterate, and coordinates generated as text are awkward to calibrate.
+> **Revised 2026-10-27 (user-approved):** the proposed method is now P1, a hybrid candidate generator plus a **fine-tuned SigLIP/CLIP-sized scorer**, with **conformal abstention**. The earlier gradient-boosted feature re-ranker becomes P0, the baseline and fallback. A generative VLM (ShowUI/UI-TARS/Qwen2-VL-2B) was considered and rejected as the main method: too tight for ~6 GB free VRAM, slow to iterate, and coordinates generated as text are awkward to calibrate. **Merged the same day with `docs/proposal_research_depth.md` (C1 to C5):** pre-registered P0/P1 selection rule, synthetic-to-real research question, temperature scaling and risk-coverage curves, own tool-calling loop (Week 4), and a learned outcome verifier (Week 10 stretch).
 
 **Research question.** Does fine-tuning a vision-language dual encoder to score hybrid UI candidates (from UIA/DOM, OCR and a detector), with conformal abstention, select the correct UI element for a natural-language instruction more reliably than metadata-only, OCR-only, visual-matching, zero-shot pretrained and feature-re-ranker baselines, especially on unseen layout families, and does its abstention keep the promised coverage under layout shift?
 
@@ -207,16 +207,21 @@ orion/
 | B3 | Pretrained grounding or detection model, zero-shot, no adaptation |
 | B4 | Simple rule-based fusion of B1 to B3 (no learning) |
 | B5 | Simple visual matching (OpenCV template/feature matching against a reference crop); required by spec 6.6, added 2026-10-24 |
-| B6 | Gradient-boosted / logistic **feature re-ranker** over the same candidates as P (text similarity, role, position, size, frozen-backbone embedding similarity) |
-| P | **Proposed:** hybrid candidates (UIA/DOM, OCR boxes, detector) → **fine-tuned SigLIP/CLIP-sized dual encoder** scoring each (instruction, candidate crop + context) pair, trained with a listwise/contrastive loss and hard negatives (duplicate labels, neighbouring controls, disabled twins) → **split-conformal abstention** (and a Mondrian per-app-family variant) |
+| P0 | Gradient-boosted / logistic **feature re-ranker** over the same candidates as P1 (text similarity, role, position, size, frozen-backbone embedding similarity). Baseline and fallback. |
+| P1 | **Proposed:** hybrid candidates (UIA/DOM, OCR boxes, detector, merged and de-duplicated) → **fine-tuned SigLIP/CLIP-sized image-text scorer** (LoRA on attention layers plus a small fusion MLP over image embedding, instruction embedding and structured features), trained with **listwise softmax cross-entropy (InfoNCE-style)** over each screen's candidates and logged **hard negatives** (same text/different role, same role/similar text, duplicate labels in other containers, disabled or hidden twins, spatial neighbours) |
+| +C3 | Temperature scaling + **split-conformal abstention** (and a Mondrian per-app-family variant), applied to whichever of P0/P1 is selected |
+
+**Pre-registered selection rule.** P1 becomes ORION's grounding method only if it beats P0 on **validation** target-selection rate with a bootstrap 95% CI on the difference that excludes 0. Otherwise P0 ships and P1 is reported as a negative result. Both are reported on the test split either way.
+
+**Second research question (synthetic-to-real).** How much of the synthetic-to-real gap is closed by each randomization factor (layout, theme, font, scaling, label language, icon style)? Train P1 on synthetic data with all factors on, then leave one factor out at a time; evaluate every model on the same frozen **real-app set** (Notepad, Calculator, Paint, Settings without personal data), which is never used for training or tuning.
 
 **What is my own work vs pretrained (for the report).** Pretrained and acknowledged: the SigLIP/CLIP backbone weights, the OCR engine, the detector. My own: candidate generation and fusion, the synthetic data generator, the training objective and hard-negative mining, the fine-tuning runs, conformal calibration, the evaluation harness, and the agent runtime and policy engine around it.
 
-**Calibration (conformal).** Nonconformity score = 1 − softmax score of a candidate. The threshold is chosen on a held-out calibration split for target coverage 1 − α (α = 0.1 primary, 0.05 secondary). Abstain when the prediction set is empty or has more than one candidate. The exchangeability assumption **does not hold** for unseen layout families, so the guarantee is only claimed in-distribution; empirical coverage on unseen families is measured and reported whatever it turns out to be.
+**Calibration (conformal).** First, temperature scaling on the calibration split (report ECE before and after). Nonconformity score = 1 − calibrated softmax score of a candidate. The threshold is chosen on a held-out calibration split (from the training layout families) for target coverage 1 − α (α = 0.1 primary, 0.05 secondary). **Act only if** the prediction set contains exactly one candidate; otherwise abstain → re-observe → ask the user. Report **risk-coverage curves** (error rate vs fraction answered) per split: in-distribution synthetic, held-out synthetic layouts, real apps. The exchangeability assumption **does not hold** for unseen layout families, so the guarantee is only claimed in-distribution; empirical coverage on unseen families is measured and reported whatever it turns out to be.
 
 **Metrics.** Correct target-selection rate (headline), IoU hit rate at 0.5 and 0.7, precision/recall, accuracy on unseen layouts, abstention quality (precision and recall of abstaining on missing/ambiguous targets), **conformal empirical coverage and mean prediction-set size on seen and unseen layout families**, latency, peak RAM and VRAM, training time. Report sample counts and bootstrap confidence intervals. Report per-slice error analysis (control type, theme, scaling, ambiguity).
 
-**Ablations (in the harness only, never with safety disabled on the live desktop).** Remove each of: metadata candidates, OCR candidates, detector candidates, fine-tuning (frozen backbone, zero-shot), hard negatives, context around the crop, conformal abstention (replaced by a fixed confidence threshold).
+**Ablations (in the harness only, never with safety disabled on the live desktop).** Remove each of: metadata candidates, OCR candidates, detector candidates, LoRA (frozen backbone, fusion head only), hard negatives, context around the crop, each synthetic randomization factor (second research question), conformal abstention (replaced by a fixed confidence threshold).
 
 **Reporting rules.** Report negative results. No invented numbers. Record model versions, licences, seeds, hardware, data version and config for every result.
 
@@ -265,6 +270,8 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 - **Deliverables.** Planner, validator, persistence, resume logic.
 - **Acceptance.** Multi-step state is correct; invalid or hallucinated plans are rejected (invented tools, missing deps, cyclic graphs); resume after a forced crash does not repeat completed or uncertain actions (S6 on fake tools).
 - **Tests.** Property-style tests for graph validity; crash/resume tests; planner tests on a fixed prompt set (record plan validation rate and invalid-tool-call rate).
+- **Own tool-calling loop (C4).** No agent framework. The LLM backend emits a tool call as JSON; ORION validates it with the existing Pydantic tool schemas before the policy engine sees it. Where the local runtime supports it, decoding is constrained to the tool-call schema (ASSUMPTION: Ollama structured outputs; verify). Measure invalid-tool-call rate with and without constrained decoding, and for the template planner as a baseline.
+- **Background track, Weeks 4 to 7 (~3 h/week, ASSUMPTION fits the budget).** Minimal synthetic UI generator: HTML templates, each randomization factor behind an on/off switch with a seeded config, labels from the DOM. Rendering with Playwright waits until Playwright is installed in Week 6.
 - **Demo.** Plan a fake multi-step task, kill the app mid-run, resume.
 - **Cut if behind.** Use only the template planner; keep the LLM backend as an interface stub.
 
@@ -295,7 +302,7 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 - **Tests.** All safety tests pass or are listed honestly as failed/blocked with reasons.
 - **Docs.** Safety and recovery behaviour, known gaps.
 - **Demo.** Slice with an injected dialog; kill switch mid-run; resume after crash.
-- **Stretch (de-risks Wks 8 to 9).** Start the synthetic UI generator and the candidate crop extractor.
+- **Background track.** Finish the minimal synthetic generator (started Week 4) and the candidate crop extractor, so Week 8 is annotation, baselines and frozen splits, not building the generator from scratch.
 - **Cut if behind.** Limit failure types to dialog, missing element, timeout, crash.
 
 ### Week 8: Stage 6a grounding dataset, annotation protocol, baselines, frozen splits
@@ -308,17 +315,17 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 - **Cut if behind.** Reduce to the synthetic set plus Notepad/Calculator; lower the target size and say so in the report.
 
 ### Week 9: Stage 6b hybrid method and evaluation (Gate B)
-- **Goal.** Train or adapt P and test it fairly.
-- **Tasks.** Install CUDA PyTorch (approval needed) and measure peak VRAM; candidate generation and crop extraction; B6 feature re-ranker (cross-validated on training families only); fine-tune the SigLIP/CLIP scorer (listwise/contrastive loss, hard negatives, mixed precision, seeds 0/1/2); split-conformal and Mondrian calibration on the calibration split; hyper-parameter tuning on validation only; one final evaluation on the frozen test split; ablations; per-slice error analysis; latency and memory on the real GPU; model card.
-- **Deliverables.** Fine-tuned P checkpoint (not committed; hash recorded), B6, results table with confidence intervals and coverage, ablations, error analysis, model card.
+- **Goal.** Train P0 and P1, select between them by the pre-registered rule, and test fairly.
+- **Tasks.** Install CUDA PyTorch, `transformers` and `peft` (approval needed; licences to verify) and measure peak VRAM; candidate generation and crop extraction; P0 feature re-ranker (cross-validated on training families only); fine-tune P1 (LoRA, listwise loss, hard negatives, mixed precision, seeds 0/1/2); apply the P0/P1 selection rule on validation; temperature scaling, then split-conformal and Mondrian calibration on the calibration split; synthetic-to-real leave-one-factor-out runs on the real-app set; hyper-parameter tuning on validation only; one final evaluation on the frozen test split; ablations; per-slice error analysis; latency and memory on the real GPU; model card.
+- **Deliverables.** P1 checkpoint (not committed; hash recorded), P0, selection-rule result, results table with confidence intervals, coverage and risk-coverage curves, synthetic-to-real ablation table, error analysis, model card.
 - **Acceptance (Gate B).** Results reproducible from a recorded config and seed; test set touched once for the headline numbers; data provenance and splits documented; negative or null results reported as such.
 - **Tests.** Reproduction script reruns the headline numbers; sanity checks (random baseline, shuffled labels).
 - **Demo.** Results walkthrough and 5 representative failures.
-- **Cut if behind.** Fall back to P-lite = frozen backbone + B6 re-ranker + conformal abstention, and report it as such. Conformal abstention is never cut.
+- **Cut if behind.** Follow cut rule 4 in section 9 (freeze the P1 backbone; shrink the leave-one-out; finally ship P0 with conformal abstention), and report it as such. Conformal abstention is never cut.
 
 ### Week 10: Stage 6c integrate grounding, error analysis, optional Stage 7
 - **Goal.** Make grounding useful inside the agent and learn from its failures.
-- **Tasks.** Add grounding as the **fallback tier** of perception (order: documented semantic API, DOM/accessibility, OCR, visual grounding, re-observe and verify); abstain or ask the user when ungrounded; confidence is never treated as proof; re-run slice with a UIA-hidden control to show the fallback working; **Stretch:** collect outcome records and train the action-outcome classifier, compare with explicit rules on held-out runs; resolve integration bugs; add buffer.
+- **Tasks.** Add grounding as the **fallback tier** of perception (order: documented semantic API, DOM/accessibility, OCR, visual grounding, re-observe and verify); abstain or ask the user when ungrounded; confidence is never treated as proof; re-run slice with a UIA-hidden control to show the fallback working; **Stretch (C5):** collect outcome records and train a **learned outcome verifier** on before/after screenshots of the target region plus the structured outcome features (small CNN or the P1 backbone's frozen image features with a classification head); compare with explicit rules and a logistic/decision-tree baseline on held-out runs; it never replaces postcondition verification or authorizes a consequential action; resolve integration bugs; add buffer.
 - **Deliverables.** Integrated grounding fallback, error analysis, optional outcome-predictor results.
 - **Acceptance.** The agent never takes a high-impact action on an ungrounded or low-confidence target; fallback demo works on at least one case where metadata is unavailable.
 - **Cut if behind.** Skip the outcome predictor entirely (it stays deferred).
@@ -376,7 +383,7 @@ Each task has a known initial state, expected result, difficulty label, scoring 
 1. Document types beyond csv/txt.
 2. LLM planner backend (use templates).
 3. Action-outcome predictor (Stretch).
-4. SigLIP/CLIP fine-tuning (fall back to frozen backbone + feature re-ranker; conformal abstention stays).
+4. Research depth, in this order: drop constrained decoding in C4 (keep schema validation and the invalid-call metric); freeze the P1 backbone and train only the fusion head (no LoRA); reduce the randomization leave-one-out to layout, theme and scaling; if P1 cannot train at all, ship P0 with conformal abstention. Never cut: the frozen test split, the real-app evaluation set, or honest reporting of where the conformal guarantee fails.
 5. Benchmark size (state the reduction).
 6. UI polish.
 7. Packaging polish (ship a developer install).
