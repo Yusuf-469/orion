@@ -1,0 +1,179 @@
+{
+  "kind": "automated acceptance run in real windows (scripted clicks; not a human run)",
+  "run_at": "2026-10-26T20:52:12.701958+00:00",
+  "git_commit": "770a637",
+  "src_dirty": false,
+  "temp_base": "C:\\Users\\yusuf\\AppData\\Local\\Temp\\orion_accept_7wkiprzc",
+  "passed": 24,
+  "failed": 0,
+  "results": [
+    {
+      "id": "S1-M2",
+      "check": "dry-run default on; simulated task ends skipped with 0 executed",
+      "result": "passed",
+      "evidence": "task 1 skipped; 10 steps planned, 0 started",
+      "seconds": 0.83
+    },
+    {
+      "id": "S1-M3/M4",
+      "check": "live simulated task runs; STOP cancels within 2 s; UI responsive",
+      "result": "passed",
+      "evidence": "cancelled 94 ms after STOP; worst UI loop gap 31 ms",
+      "seconds": 1.5
+    },
+    {
+      "id": "S1-M5/M6",
+      "check": "engaged switch blocks new tasks visibly; reset re-enables",
+      "result": "passed",
+      "evidence": "blocked while engaged; task started after reset",
+      "seconds": 1.26
+    },
+    {
+      "id": "S1-M8",
+      "check": "injected failure shows red banner and task failed",
+      "result": "passed",
+      "evidence": "task 4 failed: RuntimeError: injected test failure",
+      "seconds": 0.77
+    },
+    {
+      "id": "S1-M11",
+      "check": "closing during a live task exits within 3 s and leaves the task cancelled",
+      "result": "passed",
+      "evidence": "closed in 0.08 s; task cancelled",
+      "seconds": 0.83
+    },
+    {
+      "id": "T1",
+      "check": "files.write_new creates a verified file",
+      "result": "passed",
+      "evidence": "created hello.txt, 16 bytes; re-read sha256 d9c7f5ff8d7b matches",
+      "seconds": 0.23
+    },
+    {
+      "id": "T2",
+      "check": "write_new never overwrites",
+      "result": "passed",
+      "evidence": "invalid_input: 'hello.txt' already exists; write_new never overwrites",
+      "seconds": 0.22
+    },
+    {
+      "id": "T3",
+      "check": "files.read reads 16 bytes",
+      "result": "passed",
+      "evidence": "read 16 bytes from hello.txt (sha256 d9c7f5ff8d7b)",
+      "seconds": 0.22
+    },
+    {
+      "id": "T4",
+      "check": "path escape is blocked and nothing is written outside",
+      "result": "passed",
+      "evidence": "permission_denied: path '..\\\\escape.txt' rejected: '..' not allowed",
+      "seconds": 0.22
+    },
+    {
+      "id": "T5",
+      "check": "copy succeeds; delete blocked without files.delete",
+      "result": "passed",
+      "evidence": "permission_denied: permission not granted: files.delete",
+      "seconds": 0.44
+    },
+    {
+      "id": "T6",
+      "check": "delete asks (default No); No keeps file; Yes moves it to trash",
+      "result": "passed",
+      "evidence": "no->blocked, yes->succeeded; file now in trash",
+      "seconds": 0.28
+    },
+    {
+      "id": "T7",
+      "check": "kill hotkey (WM_HOTKEY to ORION's window) closes an open dialog; task cancelled; file kept",
+      "result": "passed",
+      "evidence": "dialog closed, task cancelled, keep.txt intact",
+      "seconds": 0.7
+    },
+    {
+      "id": "T8",
+      "check": "app.launch calculator verified by a new window (closed afterwards)",
+      "result": "passed",
+      "evidence": "new window 'Calculator' (hwnd 6883892, applicationframehost.exe) appeared",
+      "seconds": 0.48
+    },
+    {
+      "id": "T9",
+      "check": "dry-run tool shows policy, creates nothing",
+      "result": "passed",
+      "evidence": "dry-run: 'files.write_new {\"path\": \"dry.txt\", \"content\": \"x\"}' planned, not executed; would allow (reversible_local_change with granted permissions)",
+      "seconds": 0.2
+    },
+    {
+      "id": "G1",
+      "check": "dry-run goal previews both steps, creates nothing",
+      "result": "passed",
+      "evidence": "2 steps previewed",
+      "seconds": 0.23
+    },
+    {
+      "id": "G2",
+      "check": "live goal is verified_complete with correct content",
+      "result": "passed",
+      "evidence": "copied notes.txt -> backup/notes.txt; sha256 2cf24dba5fb0 matches | verified: files_identical notes.txt backup/notes.txt: sha256 2cf24dba5fb0 both",
+      "seconds": 0.31
+    },
+    {
+      "id": "G3",
+      "check": "missing info -> clarifying question, no task",
+      "result": "passed",
+      "evidence": "- Where should the copy of 'notes.txt' go?",
+      "seconds": 0.0
+    },
+    {
+      "id": "G4",
+      "check": "unsupported request is refused, not guessed",
+      "result": "passed",
+      "evidence": "The template planner does not understand 'send an email to my boss'. Supported: create a file NAME c",
+      "seconds": 0.0
+    },
+    {
+      "id": "G5",
+      "check": "escape path -> plan rejected before anything runs",
+      "result": "passed",
+      "evidence": "rejected: outside_workspace",
+      "seconds": 0.0
+    },
+    {
+      "id": "G6a",
+      "check": "move with default permissions -> plan rejected (delete not granted), nothing runs",
+      "result": "passed",
+      "evidence": "rejected: permission_denied",
+      "seconds": 0.02
+    },
+    {
+      "id": "G7",
+      "check": "goal without completion checks is 'unverified', not success",
+      "result": "passed",
+      "evidence": "outcome unverified",
+      "seconds": 0.22
+    },
+    {
+      "id": "G6b",
+      "check": "move with delete granted but declined -> partially_complete, source kept",
+      "result": "passed",
+      "evidence": "copy done, delete blocked, outcome partially_complete",
+      "seconds": 0.44
+    },
+    {
+      "id": "G8/G9",
+      "check": "real crash mid-copy -> banner on start -> Resume verifies, does not repeat",
+      "result": "passed",
+      "evidence": "subprocess exit 3; verified after resume: files_identical crash.txt crash_copy.txt: sha256 58954a31688b both",
+      "seconds": 1.0
+    },
+    {
+      "id": "G10",
+      "check": "history: delete selected (Yes) removes one row; clear all (No) keeps the rest; files untouched",
+      "result": "passed",
+      "evidence": "21 -> 20 tasks; clear declined; workspace unchanged",
+      "seconds": 0.0
+    }
+  ]
+}

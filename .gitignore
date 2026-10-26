@@ -18,6 +18,9 @@ artifacts/*
 *.sqlite3
 *.db
 
+# Generated research data (regenerate from seeds; never commit)
+research/**/out/
+
 # Model weights
 *.pt
 *.pth

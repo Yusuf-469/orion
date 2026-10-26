@@ -32,9 +32,13 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | app.launch (notepad/calculator/paint allowlist) with new-window verification | implemented-real | real test: Calculator window verified in 0.22 s, closed by the test |
 | UI tool console and confirmation dialog (kill switch closes it) | implemented-mock (offscreen) | `tests/integration/test_tool_console.py` |
 | Stage 2 docs: `docs/tools-and-permissions.md`, architecture v2, safety-and-privacy v2 | implemented | 2026-10-27 |
-| Stage 2 manual checklist T1 to T9 | **not run** | 2026-10-27: DB has no tasks, no `workspace/` folder. User said "continue"; Stage 3 started on that approval. Automated Stage 2 tests cover the same behaviours offscreen. |
+| Stage 1 checklist M2-M6, M8, M11 | verified (automated, real windows) | `artifacts/acceptance_2026-10-27.json`, commit 770a637, 2 consecutive runs 24/24. Found and fixed a real cancel race (task marked failed instead of cancelled) |
+| Stage 2 checklist T1 to T9 | verified (automated, real windows) | same report; T7 uses WM_HOTKEY to ORION's window, T8 launches and closes a real Calculator. Found and fixed stale confirmation dialogs (2nd dialog not found, leak) |
+| Stage 3 checklist G1 to G10 (G6 split into G6a/G6b; checklist expectation corrected) | verified (automated, real windows) | same report; G8/G9 = real subprocess crash mid-copy, banner, resume verified without repeat |
+| Human-only checks still open | open | M7 physical key press *during a running task* (physical press itself verified Stage 1; handling verified via WM_HOTKEY), M9 visual crispness on 100%/125% monitors. Need the user's eyes; not blocking |
 | Research design revised and merged with `docs/proposal_research_depth.md`: P0 re-ranker vs P1 fine-tuned SigLIP/CLIP scorer (pre-registered selection rule), temperature scaling + conformal abstention, synthetic-to-real research question, own tool-calling loop (Wk 4), learned outcome verifier (Wk 10 stretch) | planned (pre-registration draft) | `docs/12_WEEK_PLAN.md` §5; frozen in Week 8 |
-| Synthetic UI generator, background track Weeks 4 to 7 | planned | starts with Stage 3 |
+| Synthetic UI generator (minimal, HTML + ground truth, 6 families, 6 factor switches, abstain cases) | implemented (no rendering yet) | `src/orion/grounding/synth.py`, `tests/unit/test_synth.py` 11 passed. Self-review found a labelling bug (19% of pages had ambiguous "twins" given a single target); fixed + regression test. Sample batch v0: 60 pages, 449 instructions, 95 abstain. Boxes need Playwright rendering (Stage 4) |
+| Stage 3 Week 4 item: LLM planner measured on prompt set v1 | **blocked: needs approval** | local LLM install (Ollama + ~2 GB 3B model) |
 | Goal/plan schemas + plan validator | verified (unit) | `tests/unit/test_plan_validator.py` 14 passed |
 | Template planner (chaining, clarification, refuses unknown) | verified (unit) | `tests/unit/test_planners.py` |
 | Planner eval on fixed prompt set v1 (24 prompts) | measured | template: behaviour 24/24, plan validation 12/15 of proposed (the 3 rejections are the intended escape/device-name prompts), invalid tool calls 0. `research/planner_eval/result_template_v1.json`, commit e7b2372. **Caveat:** prompts written alongside the templates; a baseline, not evidence of generalization |
@@ -51,10 +55,10 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24, end of session)
-`-m "not real"` offscreen: **166 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
+`-m "not real"` offscreen: **180 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stage 3 gate)
-Stage 3 code, tests and docs done (2026-10-27). Waiting for: user's run of `docs/stage3_manual_checklist.md` (Stage 2's checklist was never run either), approval for a local LLM install for the C4 measurement (optional now), and approval to start Stage 4 (Windows UIA + browser control). Synthetic-generator background track not started yet.
+## RESUME HERE (Stages 2 and 3 closed except one approval)
+2026-10-27: all Stage 1-3 checklists verified by a scripted real-window acceptance run (24/24, twice); two real bugs fixed. Synthetic generator started. Only open Stage 3 item: real LLM planner measurement, which needs approval to install Ollama + a ~2 GB model. Then Stage 4 (needs approval).
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.
