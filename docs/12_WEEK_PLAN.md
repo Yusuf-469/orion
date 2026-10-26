@@ -89,7 +89,7 @@ Nothing from the spec is removed. "MVP" = built and verified within 12 weeks. "S
 | Model configuration and repeatable tests | MVP, Wk 2 onward |
 | Screenshot visual grounding and OCR | MVP (the research contribution), Wk 8 to 10 |
 | Learned action-outcome prediction | Stretch, Wk 10 |
-| Model adaptation or fine-tuning | Stretch within Wk 9 if compute/licence allow |
+| Model adaptation or fine-tuning | MVP (core of the research contribution since 2026-10-27): fine-tune a SigLIP/CLIP-sized candidate scorer, Wk 9 |
 | Demonstration-based workflow learning | Deferred (offline research only) |
 | Local language-model integration | MVP if hardware allows (planner backend), else rule-based plus optional hosted |
 | Webcam head-pose or gesture input | Deferred |
@@ -153,6 +153,7 @@ orion/
 | Persistence | SQLite | tasks, checkpoints, logs |
 | ML | scikit-learn, PyTorch (CUDA build matched to the measured driver) | baselines, training |
 | Vision | OpenCV plus pretrained models chosen after the audit | candidates to verify, not assumed: OmniParser, ShowUI, UI-TARS, Florence-2, OWL-ViT; licences and VRAM unverified |
+| Grounding backbone (P) | SigLIP or CLIP (~100M to 400M params), fine-tuned | dual encoder scoring (instruction, candidate crop) pairs; fits the measured ~6 GB free VRAM (ASSUMPTION until measured); licences to be read before use |
 | Windows control | UI Automation via pywinauto and/or uiautomation | semantic desktop interaction |
 | Browser | Playwright | DOM automation |
 | OCR | one local engine (e.g. Tesseract, EasyOCR or PaddleOCR) chosen by a Week 8 bake-off | accuracy and speed on UI text |
@@ -182,7 +183,9 @@ orion/
 
 ## 5. Pre-registered research experiment: hybrid UI visual grounding (PROPOSED; freeze in Week 8, before any tuning)
 
-**Research question.** Can a hybrid (or adapted) visual-grounding approach select the correct UI element for a natural-language instruction more reliably than accessibility-metadata-only and OCR-only baselines, especially on unfamiliar layouts?
+> **Revised 2026-10-27 (user-approved):** the proposed method P is now a hybrid candidate generator plus a **fine-tuned SigLIP/CLIP-sized scorer** with **conformal abstention**. The earlier gradient-boosted feature re-ranker becomes baseline B6 and the fallback if fine-tuning is cut. A generative VLM (ShowUI/UI-TARS/Qwen2-VL-2B) was considered and rejected as the main method: too tight for ~6 GB free VRAM, slow to iterate, and coordinates generated as text are awkward to calibrate.
+
+**Research question.** Does fine-tuning a vision-language dual encoder to score hybrid UI candidates (from UIA/DOM, OCR and a detector), with conformal abstention, select the correct UI element for a natural-language instruction more reliably than metadata-only, OCR-only, visual-matching, zero-shot pretrained and feature-re-ranker baselines, especially on unseen layout families, and does its abstention keep the promised coverage under layout shift?
 
 **Task.** Input: screenshot plus instruction (for example "the Export button in the report toolbar"). Output: bounding box, element class, text, confidence, or **abstain**. A prediction is correct if IoU with the annotated box is at least 0.5 (also report a stricter 0.7).
 
@@ -190,7 +193,7 @@ orion/
 - Synthetic web UIs generated from HTML templates with randomized layouts, themes (light/dark), display scaling (100/125/150%), languages of labels, and ground truth taken from the DOM.
 - Screenshots of safe Windows apps (Notepad, Calculator, Paint, Settings pages without personal info) with annotations.
 - No personal messages, credentials, financial or health content.
-- Target size (PROPOSED, subject to annotation effort): at least 1,500 instruction-target pairs, with duplicates, disabled, hidden and missing-target cases included.
+- Target size (PROPOSED): **at least 10,000 synthetic instruction-target pairs** (labels free from the DOM) for training and validation, plus **at least 500 hand-annotated pairs from real safe apps** used only for calibration and test. Duplicates, disabled, hidden and missing-target cases included. Fine-tuning needs far more pairs than the original 1,500-pair re-ranker target (ASSUMPTION; revisit after Week 8 learning curves).
 
 **Annotation protocol.** Written rules for nested controls, duplicate labels, disabled and hidden elements, missing targets and ambiguous instructions; double-annotate 15% to 20% and report agreement; resolve disagreements by a written rule.
 
@@ -204,11 +207,16 @@ orion/
 | B3 | Pretrained grounding or detection model, zero-shot, no adaptation |
 | B4 | Simple rule-based fusion of B1 to B3 (no learning) |
 | B5 | Simple visual matching (OpenCV template/feature matching against a reference crop); required by spec 6.6, added 2026-10-24 |
-| P | **Proposed hybrid:** candidate generation from UIA/DOM, OCR boxes and a detector, then a learned re-ranker and calibrated abstention (start with gradient-boosted or logistic features: text similarity, role, position, size, visual embedding similarity; adapt a small model only if VRAM and licences allow) |
+| B6 | Gradient-boosted / logistic **feature re-ranker** over the same candidates as P (text similarity, role, position, size, frozen-backbone embedding similarity) |
+| P | **Proposed:** hybrid candidates (UIA/DOM, OCR boxes, detector) → **fine-tuned SigLIP/CLIP-sized dual encoder** scoring each (instruction, candidate crop + context) pair, trained with a listwise/contrastive loss and hard negatives (duplicate labels, neighbouring controls, disabled twins) → **split-conformal abstention** (and a Mondrian per-app-family variant) |
 
-**Metrics.** Correct target-selection rate (headline), IoU hit rate at 0.5 and 0.7, precision/recall, accuracy on unseen layouts, abstention quality (precision and recall of abstaining on missing/ambiguous targets), latency, peak RAM and VRAM. Report sample counts and bootstrap confidence intervals. Report per-slice error analysis (control type, theme, scaling, ambiguity).
+**What is my own work vs pretrained (for the report).** Pretrained and acknowledged: the SigLIP/CLIP backbone weights, the OCR engine, the detector. My own: candidate generation and fusion, the synthetic data generator, the training objective and hard-negative mining, the fine-tuning runs, conformal calibration, the evaluation harness, and the agent runtime and policy engine around it.
 
-**Ablations (in the harness only, never with safety disabled on the live desktop).** Remove each of: metadata features, OCR features, visual detector, re-ranker, abstention.
+**Calibration (conformal).** Nonconformity score = 1 − softmax score of a candidate. The threshold is chosen on a held-out calibration split for target coverage 1 − α (α = 0.1 primary, 0.05 secondary). Abstain when the prediction set is empty or has more than one candidate. The exchangeability assumption **does not hold** for unseen layout families, so the guarantee is only claimed in-distribution; empirical coverage on unseen families is measured and reported whatever it turns out to be.
+
+**Metrics.** Correct target-selection rate (headline), IoU hit rate at 0.5 and 0.7, precision/recall, accuracy on unseen layouts, abstention quality (precision and recall of abstaining on missing/ambiguous targets), **conformal empirical coverage and mean prediction-set size on seen and unseen layout families**, latency, peak RAM and VRAM, training time. Report sample counts and bootstrap confidence intervals. Report per-slice error analysis (control type, theme, scaling, ambiguity).
+
+**Ablations (in the harness only, never with safety disabled on the live desktop).** Remove each of: metadata candidates, OCR candidates, detector candidates, fine-tuning (frozen backbone, zero-shot), hard negatives, context around the crop, conformal abstention (replaced by a fixed confidence threshold).
 
 **Reporting rules.** Report negative results. No invented numbers. Record model versions, licences, seeds, hardware, data version and config for every result.
 
@@ -287,6 +295,7 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 - **Tests.** All safety tests pass or are listed honestly as failed/blocked with reasons.
 - **Docs.** Safety and recovery behaviour, known gaps.
 - **Demo.** Slice with an injected dialog; kill switch mid-run; resume after crash.
+- **Stretch (de-risks Wks 8 to 9).** Start the synthetic UI generator and the candidate crop extractor.
 - **Cut if behind.** Limit failure types to dialog, missing element, timeout, crash.
 
 ### Week 8: Stage 6a grounding dataset, annotation protocol, baselines, frozen splits
@@ -300,12 +309,12 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 
 ### Week 9: Stage 6b hybrid method and evaluation (Gate B)
 - **Goal.** Train or adapt P and test it fairly.
-- **Tasks.** Candidate generation; feature extraction; re-ranker training with cross-validation on the training layout families only; calibrated abstention; optional small-model adaptation if VRAM and licence allow; hyper-parameter tuning on validation only; one final evaluation on the frozen test split; ablations; per-slice error analysis; latency and memory measurement on the real GPU; model card.
-- **Deliverables.** Trained P, results table with confidence intervals, ablations, error analysis, model card.
+- **Tasks.** Install CUDA PyTorch (approval needed) and measure peak VRAM; candidate generation and crop extraction; B6 feature re-ranker (cross-validated on training families only); fine-tune the SigLIP/CLIP scorer (listwise/contrastive loss, hard negatives, mixed precision, seeds 0/1/2); split-conformal and Mondrian calibration on the calibration split; hyper-parameter tuning on validation only; one final evaluation on the frozen test split; ablations; per-slice error analysis; latency and memory on the real GPU; model card.
+- **Deliverables.** Fine-tuned P checkpoint (not committed; hash recorded), B6, results table with confidence intervals and coverage, ablations, error analysis, model card.
 - **Acceptance (Gate B).** Results reproducible from a recorded config and seed; test set touched once for the headline numbers; data provenance and splits documented; negative or null results reported as such.
 - **Tests.** Reproduction script reruns the headline numbers; sanity checks (random baseline, shuffled labels).
 - **Demo.** Results walkthrough and 5 representative failures.
-- **Cut if behind.** Keep the learned re-ranker only (no model adaptation); skip small-model fine-tuning.
+- **Cut if behind.** Fall back to P-lite = frozen backbone + B6 re-ranker + conformal abstention, and report it as such. Conformal abstention is never cut.
 
 ### Week 10: Stage 6c integrate grounding, error analysis, optional Stage 7
 - **Goal.** Make grounding useful inside the agent and learn from its failures.
@@ -367,7 +376,7 @@ Each task has a known initial state, expected result, difficulty label, scoring 
 1. Document types beyond csv/txt.
 2. LLM planner backend (use templates).
 3. Action-outcome predictor (Stretch).
-4. Small-model fine-tuning (keep the learned re-ranker).
+4. SigLIP/CLIP fine-tuning (fall back to frozen backbone + feature re-ranker; conformal abstention stays).
 5. Benchmark size (state the reduction).
 6. UI polish.
 7. Packaging polish (ship a developer install).

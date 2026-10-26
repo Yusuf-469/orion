@@ -163,6 +163,8 @@ S8 is added because mixed DPI was measured in section 1. | PROPOSED
 
 ## 6. Pre-registered experiment: hybrid UI visual grounding (PROPOSED; to be frozen in Week 8 before any tuning)
 
+> **Revised 2026-10-27 (user-approved, before any freeze).** P is now a fine-tuned SigLIP/CLIP-sized dual encoder scoring hybrid candidates, with split-conformal (and Mondrian) abstention. The feature re-ranker below becomes baseline B6 and the fallback. The authoritative version is `docs/12_WEEK_PLAN.md` section 5; where they differ, the plan wins.
+
 **Research question.** Does a hybrid candidate-generation plus learned re-ranking approach with calibrated abstention select the correct UI element for a natural-language instruction more reliably than metadata-only, OCR-only and zero-shot pretrained grounding, especially on unseen layout families?
 
 **Task.** Input: screenshot and instruction. Output: box, element class, text, confidence, or ABSTAIN. A prediction is correct if IoU ≥ 0.5 with gold (0.7 also reported). For missing-target items, the correct output is ABSTAIN.
@@ -185,7 +187,8 @@ S8 is added because mixed DPI was measured in section 1. | PROPOSED
 | B3 | Pretrained grounding model, zero-shot (Florence-2 first; a 2B UI-VLM if it fits in VRAM) |
 | B4 | Rule-based fusion of B1 to B3 |
 | B5 | Simple visual matching (template/feature matching against a reference crop): **required by spec 6.6, missing from the planner and CLAUDE.md** |
-| P  | Candidates from B1, B2 and B3 → features (text similarity, role, position, size, visual-embedding similarity, source agreement) → gradient-boosted re-ranker → calibrated abstention threshold chosen on validation |
+| B6 | Candidates from B1, B2 and B3 → features (text similarity, role, position, size, visual-embedding similarity, source agreement) → gradient-boosted re-ranker (was P before 2026-10-27) |
+| P  | Same candidates → fine-tuned SigLIP/CLIP-sized scorer (listwise/contrastive loss, hard negatives) → conformal abstention (α = 0.1 primary) |
 
 **Metrics.** Target-selection accuracy (headline), IoU@0.5 and IoU@0.7, accuracy on unseen families, abstention precision and recall, latency (p50/p95), peak RAM and VRAM. 95% bootstrap CIs (≥ 1,000 resamples) and a paired test of P vs. the best baseline on the same items. Per-slice error analysis (control type, theme, scale, ambiguity).
 
