@@ -34,6 +34,19 @@ class OllamaBackend:
         self.timeout_s, self.num_ctx, self.seed, self.num_predict = timeout_s, num_ctx, seed, num_predict
         self.calls: list[dict[str, Any]] = []   # per-call latency and token counts
 
+    def health(self) -> str:
+        """Return the server version, or raise LLMBackendError if the server or model is unavailable."""
+        try:
+            with urllib.request.urlopen(f"{self.url}/api/version", timeout=5) as r:
+                version = json.loads(r.read())["version"]
+            with urllib.request.urlopen(f"{self.url}/api/tags", timeout=5) as r:
+                names = {m["name"].split(":")[0] for m in json.loads(r.read())["models"]}
+        except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError, ValueError) as e:
+            raise LLMBackendError(f"Ollama server not reachable at {self.url}: {e}") from None
+        if self.model.split(":")[0] not in names:
+            raise LLMBackendError(f"model {self.model!r} is not installed (have: {sorted(names)})")
+        return version
+
     def __call__(self, prompt: str) -> str:
         body: dict[str, Any] = {
             "model": self.model, "prompt": prompt, "stream": False,

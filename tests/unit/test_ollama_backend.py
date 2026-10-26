@@ -67,6 +67,16 @@ def test_server_abort_becomes_backend_error():
         srv.shutdown()
 
 
+def test_health_fails_when_server_is_down():
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()   # nothing listens on this port now
+    with pytest.raises(LLMBackendError, match="not reachable"):
+        OllamaBackend(url=f"http://127.0.0.1:{port}").health()
+
+
 def test_timeout_becomes_backend_error():
     srv, url = serve(Hangs)
     try:

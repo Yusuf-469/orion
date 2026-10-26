@@ -125,6 +125,7 @@ def run_once(a) -> dict:
             from orion.planner.llm import LLMPlanner, output_schema
             backend = OllamaBackend(model=a.model, schema=output_schema() if a.constrained else None,
                                     num_ctx=a.num_ctx)
+            backend.health()   # a dead server must abort the run, never turn into "unsupported" answers
             planner = LLMPlanner(backend, reg, pol, ws, max_repairs=a.max_repairs)
         else:
             planner = template
@@ -148,6 +149,11 @@ def run_once(a) -> dict:
                     row["reference_match"] = compare(r.plan, ref.plan) if (r.status == "ok" and ref.plan) else "none"
             if backend:
                 row["llm_calls"] = backend.calls[n_calls:]
+                lost = [c["error"] for c in row["llm_calls"] if "URLError" in c.get("error", "")
+                        or "ConnectionError" in c.get("error", "")]
+                if lost:
+                    raise SystemExit(f"ABORTED at {p['id']}: lost connection to the model server ({lost[0]}). "
+                                     f"No results written.")
             rows.append(row)
             confusion[(p["expect"], r.status)] += 1
             print(f"{p['id']} expect={p['expect']:<11} got={r.status:<11} "
