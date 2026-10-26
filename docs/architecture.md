@@ -40,10 +40,36 @@ See `docs/tools-and-permissions.md` for the tool table.
 ### Threads, not asyncio (deliberate, for now)
 Qt plus blocking Win32/UIA calls fit worker threads. Python cannot kill a thread, so the runtime stops *waiting* after the timeout or cancel grace period (0.5 s) and reports the outcome as uncertain for non-read-only tools. Revisit when async Playwright arrives in Stage 4.
 
+## Implemented in Stage 3: goal → plan → validate → run → verify → resume
+
+```
+goal text ─▶ Planner.propose()  (TemplatePlanner now; LLMPlanner = own tool-calling loop, backend pending)
+          ─▶ plan_request(): clarify | unsupported | validate_plan() → invalid | ok
+          ─▶ GraphRunner.create(): tasks + plans + steps rows (SQLite v2)
+          ─▶ GraphRunner.run(): pick eligible step (deps succeeded; read-only < reversible < consequential)
+                 resolve ${step.field} refs → checkpoint if consequential → action id + RUNNING (1 txn)
+                 → ToolRuntime (policy/confirm/timeout/cancel) → Verifier checks postconditions
+             finish: goal completion checks → Outcome (spec 9) → task status
+          ─▶ GraphRunner.resume() after a crash: re-observe; read-only RUNNING steps re-run;
+                 other RUNNING steps → postconditions hold ? succeeded : needs_review (never repeated)
+```
+
+| Module | Role |
+|---|---|
+| `orion.planner.schemas` | Goal (constraints, authorized outputs, completion checks, missing info), PlanStep, Plan, typed checks, Outcome |
+| `orion.planner.validator` | Rejects invented tools, bad args, missing/cyclic deps, bad references, writes outside authorized outputs or workspace, denied permissions, constraint contradictions, consequential steps without checkpoints, unanswered questions |
+| `orion.planner.template` | Deterministic phrase planner; chains clauses with "then"; asks instead of guessing; refuses unknown requests |
+| `orion.planner.llm` | Own tool-calling loop: registry-derived prompt, JSON extraction, schema + validator checks, one repair round, C4 metrics. Model output cannot change the request, goal id or policy. |
+| `orion.verification` | Read-only checks: file_exists, file_absent, file_contains, files_identical, app_window_open |
+| `orion.orchestration.graph_runner` | DAG execution, checkpoints, outcomes, resume |
+| `orion.memory` (schema v2) | plans, checkpoints, per-step tool/args/output/action id, task outcome; backs up older DBs before migrating; history delete |
+
+Outcomes (spec 9): `verified_complete` (all goal checks pass), `partially_complete`, `blocked`, `failed`, `cancelled`, `unverified` (no goal checks: never reported as success), `dry_run`.
+
 ## Planned, mapped onto these seams
 | Stage | Plugs in where |
 |---|---|
-| 3: goals, task graph, planner, resume | the runner's list of actions becomes a validated dependency graph with checkpoints; task outcome adds "partially complete" and "unverified" (spec 9); history inspect/delete controls (spec 10) |
+| 3 (remaining) | real LLM backend for `LLMPlanner` (needs a local model install, approval pending) |
 | 4: UIA and browser perception, verification | new tools behind the same runtime; re-observe after each action; verifier postconditions decide success |
 | 5: recovery | the runner's failure branch hands off to the recovery engine |
 | 6: visual grounding | perception fallback tier: fine-tuned SigLIP/CLIP scorer over hybrid candidates with conformal abstention; abstain → ask the user |

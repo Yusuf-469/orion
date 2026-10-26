@@ -35,16 +35,26 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Stage 2 manual checklist T1 to T9 | **not run** | 2026-10-27: DB has no tasks, no `workspace/` folder. User said "continue"; Stage 3 started on that approval. Automated Stage 2 tests cover the same behaviours offscreen. |
 | Research design revised and merged with `docs/proposal_research_depth.md`: P0 re-ranker vs P1 fine-tuned SigLIP/CLIP scorer (pre-registered selection rule), temperature scaling + conformal abstention, synthetic-to-real research question, own tool-calling loop (Wk 4), learned outcome verifier (Wk 10 stretch) | planned (pre-registration draft) | `docs/12_WEEK_PLAN.md` §5; frozen in Week 8 |
 | Synthetic UI generator, background track Weeks 4 to 7 | planned | starts with Stage 3 |
-| Planner, task graph, resume (Stage 3) | planned | |
+| Goal/plan schemas + plan validator | verified (unit) | `tests/unit/test_plan_validator.py` 14 passed |
+| Template planner (chaining, clarification, refuses unknown) | verified (unit) | `tests/unit/test_planners.py` |
+| Planner eval on fixed prompt set v1 (24 prompts) | measured | template: behaviour 24/24, plan validation 12/15 of proposed (the 3 rejections are the intended escape/device-name prompts), invalid tool calls 0. `research/planner_eval/result_template_v1.json`, commit e7b2372. **Caveat:** prompts written alongside the templates; a baseline, not evidence of generalization |
+| LLM planner loop (C4) | implemented-mock | fake backends only (hallucinated tool repaired, relabel rejected, garbage counted). **No real model yet**: needs a local LLM install (approval) |
+| Verifier (read-only checks) | verified | used by every graph test |
+| Graph runner: deps, priority order, checkpoints, outcomes (spec 9), cancel, dry-run of whole plan | verified (real disk, tmp dir) | `tests/integration/test_graph_runner.py` |
+| Crash-safe resume (gate S6) | verified (real crash) | subprocess `os._exit` mid-tool: completed step not repeated; verifiable step "verified after resume"; unverifiable step needs_review, **0 repeats**; read-only step re-run. 3 tests |
+| Schema v2 migration with automatic backup | verified (real) | user's `data/orion.db` migrated 2026-10-27; `data/orion.db.v1.bak` created |
+| History inspect/delete (spec 10) | implemented-mock (offscreen) | `tests/integration/test_goal_ui.py` |
+| Goal box, resume banner in UI | implemented-mock (offscreen) + app launch verified | `test_goal_ui.py`; app launched as "ORION (Stage 3)", exit 0 |
+| Stage 3 manual checklist G1 to G10 | planned | `docs/stage3_manual_checklist.md` |
 | UIA / browser perception and verification (Stage 4) | planned | |
 | Recovery (Stage 5) | planned | |
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24, end of session)
-`-m "not real"` offscreen: **109 passed**. `-m real`: **2 passed** (hotkey message handling, Calculator launch).
+`-m "not real"` offscreen: **166 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stage 2 gate)
-Stage 2 code, tests and docs are done. Waiting for: the user's run of `docs/stage2_manual_checklist.md`, then approval to start Stage 3 (goals, task graph, planner, persistence, resume).
+## RESUME HERE (Stage 3 gate)
+Stage 3 code, tests and docs done (2026-10-27). Waiting for: user's run of `docs/stage3_manual_checklist.md` (Stage 2's checklist was never run either), approval for a local LLM install for the C4 measurement (optional now), and approval to start Stage 4 (Windows UIA + browser control). Synthetic-generator background track not started yet.
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.

@@ -2,7 +2,7 @@
 
 A general-purpose autonomous Windows computer-use agent (final-year project). See `CLAUDE.md`, `docs/12_WEEK_PLAN.md` and `STATUS.md`.
 
-**Current stage: 1 (desktop shell).** Tasks are simulated; ORION does not control the desktop yet.
+**Current stage: 3 (goals, planning, persistence, resume).** ORION plans simple file/app goals with a deterministic template planner, validates the plan, runs it through permissioned tools confined to `workspace/`, verifies the result, and resumes safely after a crash. No UI clicking/typing or browser control yet (Stage 4).
 
 ## Developer setup (Windows, Python 3.11)
 ```powershell

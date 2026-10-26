@@ -1,0 +1,17 @@
+{
+  "planner": "template",
+  "prompt_set": "v1",
+  "n": 24,
+  "git_commit": "e7b2372",
+  "run_at": "2026-10-26T20:44:16.946542+00:00",
+  "behaviour_accuracy": "24/24",
+  "plan_validation_rate": "12/15 of proposed plans",
+  "invalid_tool_calls": 0,
+  "confusion": {
+    "clarify->clarify": 4,
+    "invalid->invalid": 3,
+    "ok->ok": 12,
+    "unsupported->unsupported": 5
+  },
+  "mismatches": []
+}
