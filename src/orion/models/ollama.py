@@ -24,18 +24,21 @@ class LLMBackendError(RuntimeError):
 
 class OllamaBackend:
     def __init__(self, model: str = "phi3.5", url: str = "http://127.0.0.1:11434",
-                 schema: dict[str, Any] | None = None, timeout_s: float = 180, num_ctx: int = 8192, seed: int = 0):
+                 schema: dict[str, Any] | None = None, timeout_s: float = 180, num_ctx: int = 8192, seed: int = 0,
+                 num_predict: int = 1024):
         host = urlparse(url).hostname
         if host not in _LOCAL:
             raise ValueError(f"refusing non-local LLM endpoint {url!r} (local-first rule)")
         self.model, self.url, self.schema = model, url.rstrip("/"), schema
-        self.timeout_s, self.num_ctx, self.seed = timeout_s, num_ctx, seed
+        # num_predict caps output length: a plan needs ~300 tokens; the cap stops runaway generations.
+        self.timeout_s, self.num_ctx, self.seed, self.num_predict = timeout_s, num_ctx, seed, num_predict
         self.calls: list[dict[str, Any]] = []   # per-call latency and token counts
 
     def __call__(self, prompt: str) -> str:
         body: dict[str, Any] = {
             "model": self.model, "prompt": prompt, "stream": False,
-            "options": {"temperature": 0, "seed": self.seed, "num_ctx": self.num_ctx},
+            "options": {"temperature": 0, "seed": self.seed, "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict},
         }
         if self.schema is not None:
             body["format"] = self.schema
@@ -49,6 +52,9 @@ class OllamaBackend:
             detail = e.read().decode("utf-8", "replace")[:300]
             self.calls.append({"seconds": round(time.monotonic() - t0, 2), "error": f"HTTP {e.code}: {detail}"})
             raise LLMBackendError(f"HTTP {e.code}: {detail}") from None
+        except (TimeoutError, urllib.error.URLError, ConnectionError) as e:
+            self.calls.append({"seconds": round(time.monotonic() - t0, 2), "error": f"{type(e).__name__}: {e}"})
+            raise LLMBackendError(f"{type(e).__name__}: {e}") from None
         self.calls.append({"seconds": round(time.monotonic() - t0, 2),
                            "prompt_tokens": data.get("prompt_eval_count"), "output_tokens": data.get("eval_count")})
         return data.get("response", "")

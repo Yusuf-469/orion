@@ -121,7 +121,7 @@ def main() -> int:
         "planner": a.planner, "model": a.model if a.planner == "llm" else None,
         "constrained_decoding": a.constrained if a.planner == "llm" else None,
         "num_ctx": a.num_ctx if a.planner == "llm" else None, "max_repairs": a.max_repairs,
-        "decoding": "temperature 0, seed 0" if a.planner == "llm" else "deterministic",
+        "decoding": f"temperature 0, seed 0, num_predict {backend.num_predict}" if backend else "deterministic",
         "prompt_set": data["version"], "n": n, "git_commit": commit, "src_dirty": dirty,
         "run_at": datetime.now(timezone.utc).isoformat(),
         "behaviour_accuracy": f"{sum(r['expect'] == r['got'] for r in rows)}/{n}",
