@@ -39,7 +39,11 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Research design revised and merged with `docs/proposal_research_depth.md`: P0 re-ranker vs P1 fine-tuned SigLIP/CLIP scorer (pre-registered selection rule), temperature scaling + conformal abstention, synthetic-to-real research question, own tool-calling loop (Wk 4), learned outcome verifier (Wk 10 stretch) | planned (pre-registration draft) | `docs/12_WEEK_PLAN.md` §5; frozen in Week 8 |
 | Synthetic UI generator (minimal, HTML + ground truth, 6 families, 6 factor switches, abstain cases) | implemented (no rendering yet) | `src/orion/grounding/synth.py`, `tests/unit/test_synth.py` 11 passed. Self-review found a labelling bug (19% of pages had ambiguous "twins" given a single target); fixed + regression test. Sample batch v0: 60 pages, 449 instructions, 95 abstain. Boxes need Playwright rendering (Stage 4) |
 | Stage 3 Week 4 item: LLM planner measured on prompt set v1 | done | see C4 rows above |
-| Plan-review step before running any LLM plan | planned (required before the LLM planner is offered in the app) | finding 4 of the C4 report |
+| Plan-review step before running any LLM plan | implemented-mock (offscreen) | opt-in `planner = "llm"`; review dialog default No; invalid plans never reach review; `tests/integration/test_goal_ui.py`. Commit 76c1d08 |
+| C4 iteration 2 (fixes + dev-set tuning + one final v1 test) | measured | v1: behaviour 5→8/24, safe 11→12/12, exact plan 2→4/12, 3 reload-separated runs identical (reload hypothesis rejected). Dev paraphrases: LLM 6/8 vs template 3/8. Found and fixed an ORION schema bug that depressed all earlier constrained results. `research/reports/c4_planner_eval_v1.md` |
+| Content-drift check (invented / empty file text) | verified (unit) | `test_plan_validator.py` |
+| Quote-aware clause splitting; file text never in logs/step names | verified | `test_planners.py`, `test_tool_console.py` |
+| Eval safety: health check, abort on lost server | verified (unit + caught a real dead-server run) | `test_ollama_backend.py` |
 | Goal/plan schemas + plan validator | verified (unit) | `tests/unit/test_plan_validator.py` 14 passed |
 | Template planner (chaining, clarification, refuses unknown) | verified (unit) | `tests/unit/test_planners.py` |
 | Planner eval on fixed prompt set v1 (24 prompts) | measured | template: behaviour 24/24, plan validation 12/15 of proposed (the 3 rejections are the intended escape/device-name prompts), invalid tool calls 0. `research/planner_eval/result_template_v1.json`, commit e7b2372. **Caveat:** prompts written alongside the templates; a baseline, not evidence of generalization |
@@ -58,7 +62,7 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24, end of session)
-`-m "not real"` offscreen: **190 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
+`-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
 ## RESUME HERE (Stages 1 to 3 closed)
 2026-10-27: all Stage 1-3 checklists verified by a scripted real-window acceptance run (24/24, twice); real-LLM planner measured (C4 baseline). Waiting for approval to start Stage 4 (Windows UIA + browser control). Only human-eye checks remain open (M7 during a task, M9 DPI look).

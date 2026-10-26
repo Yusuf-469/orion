@@ -24,7 +24,8 @@
 - Ollama 0.40.11 and Phi-3.5-mini (3.8B, Q4_0, **MIT licence, verified with `ollama show --license`**) are installed for the planner experiment (C4). The app itself still uses the deterministic template planner.
 - The Ollama server listens on **127.0.0.1:11434** (verified). `OllamaBackend` refuses any non-loopback URL, so prompts (which contain the user's request and the tool list) never leave the machine.
 - Model output is **untrusted**: it is parsed, schema-checked and run through the same plan validator, policy engine and confirmation flow as any plan. The model cannot change the user's request, the goal id, permissions or a tool's side-effect category (tested).
-- Ollama runs as a background service started by its installer; quit it from the tray icon, or uninstall with `winget uninstall Ollama.Ollama`. The model is stored under `%USERPROFILE%\.ollama\models` (about 2.2 GB).
+- The app can use the LLM planner only when `planner = "llm"` is set in `orion.toml`. Every LLM plan is shown in a review dialog (default **No**) before anything runs; plans that fail validation are never offered.
+- Ollama's server (`ollama serve`) runs as a background process; the tray app's own server start failed on this machine on 2026-10-27, so the server was started directly. End it from Task Manager (`ollama.exe`), or uninstall with `winget uninstall Ollama.Ollama`. The model is stored under `%USERPROFILE%\.ollama\models` (about 2.2 GB).
 
 ## What is logged
 Task titles, tool ids and arguments (redacted), statuses, evidence strings (file paths, sizes, hash prefixes, window titles), errors, kill-switch use. Stored in `<data_dir>/logs/orion.jsonl` and `<data_dir>/orion.db` (gitignored). File contents read by `files.read` are not logged (evidence has only size and hash). **However**, the step name shows the tool arguments (redacted, cut to 80 characters), so the first part of the text given to `files.write_new` does appear in the log and DB.

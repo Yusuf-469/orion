@@ -41,6 +41,45 @@ GPU memory (VERIFIED, `ollama ps` / `nvidia-smi`): 3.8 GB at `num_ctx` 4096 (5.4
   - Constrained decoding always on for small local models.
   - Next C4 iteration: a stronger local model if VRAM allows (e.g. a 7B at 4-bit is ~5 GB, which cannot coexist with the grounding model; schedule them), repeated runs across sessions with confidence intervals, and a larger prompt set written independently of the template planner.
 
+## Iteration 2 (same day): fixes, tuned on a separate dev set, one final test on v1
+
+**Method.** A separate dev set (`prompts_dev_v1.json`, 16 prompts, new file names and paraphrases) was written *before* any tuning; all prompt changes were judged on it only. The frozen v1 set was then run once (3 repeats). Prompt v1's worked examples use names and wording that appear in neither set (enforced by a unit test).
+
+**Changes.**
+- Bug found in ORION, not the model: the constrained-decoding schema left each check's `kind` optional, so the model could omit it and ORION then rejected otherwise valid plans. This depressed **all** earlier constrained results above.
+- Prompt v1: a refusal field (`unsupported_reason`), "ask only for details the user did not give", "use names and text exactly as written", "no extra check steps", and 3 worked examples.
+- ORION now sets the safety fields itself (authorized outputs, checkpoints, delete constraint), never the model.
+- Validator: written text must come from the request; empty content needs an explicit request (the model wrote `''`, which slipped past a substring check).
+
+**Dev set (16 prompts, tuning set, so optimistic):**
+
+| | Template | LLM prompt v0 | LLM prompt v1 + schema fix |
+|---|---|---|---|
+| Behaviour | 9/16 | 9/16 | 9/16 |
+| Safe | 8/8 | 8/8 | 8/8 |
+| Paraphrased tasks with the right tools | 3/8 | 4/8 | **6/8** |
+
+**Final test, frozen v1 set (`result_llm_phi35_constrained_v1_prompt_v1.json`, commit `bb6a885`, 3 repeats with the model unloaded before each):**
+
+| | Before (`e836e38`) | After (`bb6a885`) |
+|---|---|---|
+| Behaviour accuracy | 5/24 | **8/24** (8, 8, 8) |
+| Safe rate | 11/12 | **12/12** |
+| Exact plan match | 2/12 | **4/12** |
+| Validated / produced plans | 3/3 | 5/6 |
+| Invalid tool calls | 0 | 1 per run |
+| Median latency | 6.7 s | 0.9 s (many short "clarify" replies) |
+
+The result file shows `src_dirty: true` because the app UI was edited during the run; `git diff bb6a885 76c1d08` confirms the planner, model backend, tools, policy and eval script were unchanged (only `app/main_window.py` and two new config fields).
+
+**Reload hypothesis rejected.** All 24 prompts gave identical outcomes across 3 runs with a forced model unload before each. Model reloads do not explain the earlier between-session differences; the cause remains unknown (the schema bug above may have contributed, since it made results depend on whether the model happened to emit `kind`).
+
+**Conclusions after iteration 2.**
+- On the biased v1 set the template planner still wins (24/24 vs 8/24), as expected for prompts written alongside it.
+- On paraphrases the template cannot parse, the LLM now completes twice as many tasks (6/8 vs 3/8 on dev).
+- Phi-3.5's main remaining weakness: it asks a question where it should refuse, and sometimes asks for a name it was given. Both are safe (nothing runs).
+- Safety: 12/12 on v1 and 8/8 on dev; with mandatory plan review in the app, the LLM planner is usable as an **opt-in** helper for paraphrased requests, not as the default.
+
 ## Threats to validity
 - 24 prompts, one model, one quantization. Too small for strong claims; no confidence intervals across sessions yet.
 - The prompts were written alongside the template planner, so the comparison is biased in its favour. The template's 24/24 is a sanity check, not evidence of generalization.
