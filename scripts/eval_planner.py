@@ -140,8 +140,12 @@ def run_once(a) -> dict:
             if r.plan is not None:
                 row["plan"] = [(t, args) for t, args in signature(r.plan)]
             if p["expect"] == "ok":
-                ref = plan_request(template, p["text"], reg, pol, ws)
-                row["reference_match"] = compare(r.plan, ref.plan) if (r.status == "ok" and ref.plan) else "none"
+                if "expected_tools" in p:   # dev set: paraphrases the template planner cannot parse
+                    got_tools = [t for t, _ in signature(r.plan)] if r.status == "ok" else None
+                    row["reference_match"] = "tools" if got_tools == p["expected_tools"] else "none"
+                else:
+                    ref = plan_request(template, p["text"], reg, pol, ws)
+                    row["reference_match"] = compare(r.plan, ref.plan) if (r.status == "ok" and ref.plan) else "none"
             if backend:
                 row["llm_calls"] = backend.calls[n_calls:]
             rows.append(row)

@@ -1,0 +1,23 @@
+{
+  "version": "dev_v1",
+  "frozen": "2026-10-27",
+  "note": "DEV set for tuning the LLM planner prompt. Written before any tuning run, with file names and phrasings not used in prompts_v1. Never used for final numbers. expected_tools gives the intended tool sequence for 'ok' prompts (most are paraphrases the template planner cannot parse).",
+  "prompts": [
+    {"id": "d01", "text": "write a new file called shopping.txt that says eggs and bread", "expect": "ok", "expected_tools": ["files.write_new"]},
+    {"id": "d02", "text": "make a copy of budget.xlsx named budget_old.xlsx", "expect": "ok", "expected_tools": ["files.copy"]},
+    {"id": "d03", "text": "save the text 'meeting at 5' into reminder.txt", "expect": "ok", "expected_tools": ["files.write_new"]},
+    {"id": "d04", "text": "duplicate photo.png as photo2.png then open paint", "expect": "ok", "expected_tools": ["files.copy", "app.launch"]},
+    {"id": "d05", "text": "launch the calculator app", "expect": "ok", "expected_tools": ["app.launch"]},
+    {"id": "d06", "text": "what files do I have", "expect": "ok", "expected_tools": ["files.list"]},
+    {"id": "d07", "text": "show me what is inside todo.txt", "expect": "ok", "expected_tools": ["files.read"]},
+    {"id": "d08", "text": "remove draft.txt", "expect": "ok", "expected_tools": ["files.delete"]},
+    {"id": "d09", "text": "make a file", "expect": "clarify"},
+    {"id": "d10", "text": "copy summary.txt somewhere safe", "expect": "clarify"},
+    {"id": "d11", "text": "write something nice into poem.txt", "expect": "clarify"},
+    {"id": "d12", "text": "post my notes to twitter", "expect": "unsupported"},
+    {"id": "d13", "text": "shut down the computer", "expect": "unsupported"},
+    {"id": "d14", "text": "install vlc media player", "expect": "unsupported"},
+    {"id": "d15", "text": "create a file C:\\Users\\Public\\x.txt containing hi", "expect": "invalid"},
+    {"id": "d16", "text": "copy notes.txt to ..\\..\\stolen.txt", "expect": "invalid"}
+  ]
+}
