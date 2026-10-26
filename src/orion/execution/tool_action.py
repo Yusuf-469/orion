@@ -23,7 +23,12 @@ def tool_action(runtime: ToolRuntime, call: ToolCall) -> Action:
             msg += " [side effect uncertain: check before retrying]"
         raise ActionError(msg, blocked=r.error_code in BLOCKING_CODES, uncertain=r.side_effect_uncertain)
 
-    args = json.dumps(redact(call.args), ensure_ascii=False)
-    if len(args) > 80:
-        args = args[:77] + "..."
-    return Action(name=f"{call.tool_id} {args}", fn=fn, simulated=False, preview=lambda: runtime.preview(call))
+    return Action(name=f"{call.tool_id} {describe_args(call.args)}", fn=fn, simulated=False,
+                  preview=lambda: runtime.preview(call))
+
+
+def describe_args(args: dict) -> str:
+    """Arguments for step names and logs. File text is never shown, only its length."""
+    shown = {k: (f"<{len(v)} chars>" if k == "content" and isinstance(v, str) else v) for k, v in args.items()}
+    text = json.dumps(redact(shown), ensure_ascii=False)
+    return text if len(text) <= 120 else text[:117] + "..."

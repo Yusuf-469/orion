@@ -23,7 +23,7 @@ def ctx(tmp_path):
 def goal(**kw):
     # The request names every path these tests write, so intent-drift checks stay quiet unless tested.
     base = dict(goal_id="g1", objective="o", authorized_outputs=["out"],
-                request="out/a.txt out/b.txt elsewhere/a.txt outside/a.txt ..\\a.txt",
+                request="out/a.txt out/b.txt elsewhere/a.txt outside/a.txt ..\\a.txt containing hi x 1",
                 completion_checks=[FileExists(path="out/a.txt")])
     base.update(kw)
     return Goal(**base)
@@ -176,6 +176,18 @@ def test_intent_drift_silently_rewritten_path(ctx):
     errs, issues = errors(plan, g, reg, ws)
     assert ("intent_drift", "w") in errs
     assert any(i.code == "intent_drift" and i.severity == "warning" for i in issues)
+
+
+def test_intent_drift_invented_content(ctx):
+    """Observed with Phi-3.5 (p14): no content given, model invented 'Initial content for notes.txt'."""
+    reg, ws = ctx
+    g = goal(request="create a file notes.txt", authorized_outputs=["notes.txt"])
+    plan = Plan(goal_id="g1", steps=[step("w", "files.write_new",
+                                          {"path": "notes.txt", "content": "Initial content for notes.txt"})])
+    assert ("intent_drift", "w") in errors(plan, g, reg, ws)[0]
+    g2 = goal(request="create a file notes.txt containing   Buy  Milk", authorized_outputs=["notes.txt"])
+    ok = Plan(goal_id="g1", steps=[step("w", "files.write_new", {"path": "notes.txt", "content": "buy milk"})])
+    assert errors(ok, g2, reg, ws)[0] == set()
 
 
 def test_intent_named_paths_and_bak_backups_pass(ctx):

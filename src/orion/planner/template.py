@@ -34,6 +34,19 @@ SUPPORTED_PHRASES = [
 ]
 
 
+def split_clauses(text: str) -> list[str]:
+    """Split on then / and then / ; but never inside "double" or 'single' quotes."""
+    quoted: list[str] = []
+
+    def hide(m: re.Match) -> str:
+        quoted.append(m.group(0))
+        return f"\x00{len(quoted) - 1}\x00"
+
+    masked = re.sub(r'"[^"]*"|\'[^\']*\'', hide, text)
+    parts = [p for p in _SPLIT.split(masked) if p]
+    return [re.sub(r"\x00(\d+)\x00", lambda m: quoted[int(m.group(1))], p) for p in parts]
+
+
 def _path(m: re.Match, group_base: int) -> str:
     return next(g for g in m.groups()[group_base:group_base + 3] if g)
 
@@ -163,7 +176,7 @@ class TemplatePlanner:
 
     def propose(self, request: str) -> Proposal:
         text = request.strip().rstrip(".")
-        clauses = [c for c in _SPLIT.split(text) if c]
+        clauses = split_clauses(text)
         if not clauses:
             return Proposal(None, None, "empty request")
         d = _Draft()

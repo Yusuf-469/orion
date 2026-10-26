@@ -172,6 +172,17 @@ def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> 
     for p in sorted(named - used):
         warn("intent_drift", f"the request mentions {p!r} but the plan never uses it")
 
+    # Text a plan writes must come from the user's own words (seen with Phi-3.5: invented content).
+    req = _squash(goal.request)
+    for s in plan.steps:
+        v = s.args.get("content")
+        if s.tool_id == "files.write_new" and isinstance(v, str) and parse_ref(v) is None and _squash(v) not in req:
+            err("intent_drift", "file content does not come from the request (invented text)", s.id)
+
+
+def _squash(text: str) -> str:
+    return " ".join(text.lower().split())
+
 
 def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by_id, err, warn) -> None:
     if s.tool_id not in registry:

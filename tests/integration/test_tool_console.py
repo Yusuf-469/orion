@@ -74,6 +74,18 @@ def test_write_new_via_console_creates_verified_file(qapp, make_window):
     assert "re-read sha256" in step["evidence"] and not step["evidence"].startswith("simulated")
 
 
+def test_file_text_never_reaches_logs_or_step_names(qapp, make_window):
+    w = make_window()
+    secret_text = "my private diary entry"
+    _, task = run_tool(qapp, w, "files.write_new", {"path": "d.txt", "content": secret_text})
+    assert task["status"] == "succeeded"
+    step = w.store.list_steps(task["id"])[0]
+    events = " ".join(e["message"] for e in w.store.list_events(task["id"]))
+    assert secret_text not in step["name"] and secret_text not in events
+    assert "<22 chars>" in step["name"]
+    assert secret_text not in w.log_pane.toPlainText()
+
+
 def test_dry_run_tool_writes_nothing_but_shows_policy(qapp, make_window):
     w = make_window()
     w.dry_run_box.setChecked(True)

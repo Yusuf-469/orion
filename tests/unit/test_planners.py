@@ -88,12 +88,17 @@ def test_unsupported_requests_are_not_guessed(env, request_text):
     assert "does not understand" in r.message
 
 
-def test_then_inside_text_refuses_whole_request(env):
-    """Documented limitation: 'then' inside file text splits the clause; the leftover is refused."""
-    for text in ('create a file a.txt containing first this then that',
-                 'create a file a.txt containing "first this then that"'):
-        r = tplan(env, text)
-        assert r.status == "unsupported" and r.plan is None
+def test_then_inside_unquoted_text_refuses_whole_request(env):
+    """Unquoted 'then' still splits; the leftover clause is refused, so nothing wrong runs."""
+    r = tplan(env, 'create a file a.txt containing first this then that')
+    assert r.status == "unsupported" and r.plan is None
+
+
+def test_then_inside_quotes_is_kept(env):
+    r = tplan(env, 'create a file a.txt containing "first this then that" then copy a.txt to b.txt')
+    assert r.status == "ok", (r.message, r.issues)
+    assert r.plan.steps[0].args["content"] == "first this then that"
+    assert [s.tool_id for s in r.plan.steps] == ["files.write_new", "files.copy"]
 
 
 def test_out_of_workspace_request_fails_validation(env):
@@ -132,7 +137,7 @@ class Scripted:
         return self.replies.pop(0)
 
 
-REQUEST = "make a note n.txt"
+REQUEST = "make a note n.txt containing hi"
 
 
 def llm(env, backend, request=REQUEST, **kw):
