@@ -12,6 +12,7 @@ logs/
 artifacts/*
 !artifacts/env_audit_raw.txt
 !artifacts/env_audit_addendum_raw.txt
+!artifacts/acceptance_*.json
 *.png
 *.jpg
 *.sqlite3

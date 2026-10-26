@@ -54,7 +54,11 @@ class RealExecutor:
     dry_run = False
 
     def execute(self, action: Action, token: CancelToken) -> ActionResult:
-        token.raise_if_cancelled()
+        # The token can be cancelled between the runner's check and this call; report that as a
+        # cancellation, never as an error.
+        if token.is_cancelled:
+            return ActionResult(executed=False, ok=False, cancelled=True,
+                                evidence=f"not started: {token.reason or 'cancelled'}")
         try:
             evidence = action.fn(token)
         except Cancelled as e:

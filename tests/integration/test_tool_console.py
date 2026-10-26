@@ -117,6 +117,25 @@ def test_delete_confirmation_dialog(qapp, make_window, answer, expect_status, fi
     assert target.exists() is file_kept
 
 
+def test_second_confirmation_gets_a_fresh_dialog(qapp, make_window):
+    """Regression (found by the real-window acceptance run): an answered dialog stayed as a hidden
+    child, so the next confirmation could not be found and dialogs leaked."""
+    from PySide6.QtWidgets import QMessageBox
+    w = make_window(granted_permissions=WITH_DELETE)
+    for name in ("a.txt", "b.txt"):
+        (w.cfg.workspace_dir / name).write_text("x")
+        w.tool_combo.setCurrentText("files.delete")
+        w.tool_args.setText(json.dumps({"path": name}))
+        tid = w.start_tool()
+        assert _pump(qapp, 3, until=lambda: _dialog(w) is not None)
+        _dialog(w).button(QMessageBox.No).click()
+        assert _pump(qapp, 3, until=lambda: w.store.get_task(tid)["status"] == "blocked")
+        _pump(qapp, 0.1)
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    assert w.findChildren(QMessageBox) == []
+
+
 def test_kill_switch_closes_open_dialog_and_nothing_runs(qapp, make_window):
     w = make_window(granted_permissions=WITH_DELETE)
     target = w.cfg.workspace_dir / "x.txt"

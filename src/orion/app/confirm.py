@@ -56,6 +56,9 @@ class QtConfirmer(QObject):
             clicked = box.clickedButton()
             slot["answer"] = clicked is not None and box.standardButton(clicked) == QMessageBox.Yes
             slot["done"].set()
+            # One dialog per request: drop the name at once and free it, so no stale hidden dialog lingers.
+            box.setObjectName("orion_confirm_answered")
+            box.deleteLater()
 
         box.finished.connect(finished)
         slot["box"] = box

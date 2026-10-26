@@ -70,6 +70,26 @@ def test_cancel_before_start_runs_nothing(env):
     assert [s["status"] for s in store.list_steps(tid)] == ["cancelled"]
 
 
+def test_cancel_between_check_and_execute_is_cancelled_not_failed(env):
+    """Regression (found by the real-window acceptance run): the token is cancelled after the
+    runner's loop check but before the executor starts the action."""
+    from orion.execution import RealExecutor as RE
+
+    store, ks, runner = env
+    calls = []
+    actions = [Action("a", lambda tok: calls.append(1) or "x")]
+    tid = runner.create("race", actions, dry_run=False)
+    token = ks.new_token()
+
+    class RacingExecutor(RE):
+        def execute(self, action, tok):
+            tok.cancel("kill switch")      # lands exactly in the race window
+            return super().execute(action, tok)
+
+    assert runner.run(tid, actions, RacingExecutor(), token) == Status.CANCELLED
+    assert calls == [] and store.get_task(tid)["status"] == "cancelled"
+
+
 def test_dry_run_never_calls_action(env):
     store, ks, runner = env
     calls = []
