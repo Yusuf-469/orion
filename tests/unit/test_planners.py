@@ -220,6 +220,42 @@ def test_ollama_backend_refuses_remote_hosts():
     OllamaBackend(url="http://localhost:11434")
 
 
+def test_llm_can_decline(env):
+    r = llm(env, Scripted(json.dumps({"unsupported_reason": "no tool can send email", "goal": {"objective": "x"},
+                                      "plan": {"steps": []}})))
+    assert r.status == "unsupported" and "no tool can send email" in r.message
+
+
+def test_llm_empty_plan_without_question_is_unsupported(env):
+    r = llm(env, Scripted(json.dumps({"goal": {"objective": "x"}, "plan": {"steps": []}})))
+    assert r.status == "unsupported" and r.plan is None
+
+
+def test_normalize_sets_safety_fields_not_the_model(env):
+    out = {"goal": {"objective": "remove n.txt", "authorized_outputs": ["everything"],
+                    "constraints": {"preserve_source_files": True, "allow_delete": False}},
+           "plan": {"steps": [{"id": "d", "description": "delete", "tool_id": "files.delete",
+                               "args": {"path": "n.txt"}, "checkpoint_before": False}]}}
+    r = llm(env, Scripted(json.dumps(out)), request="remove n.txt")
+    assert r.status == "ok", r.issues
+    assert r.goal.authorized_outputs == ["n.txt"]          # not the model's "everything"
+    assert r.plan.steps[0].checkpoint_before is True        # forced for consequential steps
+    assert r.goal.constraints.allow_delete and not r.goal.constraints.preserve_source_files
+
+
+def test_prompt_examples_do_not_leak_eval_prompts():
+    from pathlib import Path
+    from orion.planner.llm import _EXAMPLES
+    texts = []
+    for f in ("prompts_v1.json", "prompts_dev_v1.json"):
+        texts += [p["text"] for p in json.loads((Path("research/planner_eval") / f).read_text(
+            encoding="utf-8"))["prompts"]]
+    for q, a in _EXAMPLES:
+        assert q not in texts
+        for name in ("ideas.txt", "plan.docx", "pizza"):
+            assert not any(name in t for t in texts)
+
+
 def test_extract_json():
     assert extract_json('noise {"a": 1} tail') == {"a": 1}
     with pytest.raises(ValueError):

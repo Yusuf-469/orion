@@ -91,7 +91,7 @@ COUNTS = ("behaviour_accuracy", "safe_rate", "plan_validation", "reference_match
 def aggregate(runs: list[dict]) -> dict:
     """Mean and range of each metric over repeated runs, plus per-prompt outcome stability."""
     out = {k: runs[0][k] for k in ("planner", "model", "constrained_decoding", "num_ctx", "max_repairs",
-                                   "decoding", "prompt_set", "n", "git_commit", "src_dirty")}
+                                   "decoding", "llm_prompt_version", "prompt_set", "n", "git_commit", "src_dirty")}
     out["repeats"] = len(runs)
     for k in COUNTS:
         nums = [int(r[k].split("/")[0]) for r in runs]
@@ -172,6 +172,7 @@ def run_once(a) -> dict:
         "constrained_decoding": a.constrained if a.planner == "llm" else None,
         "num_ctx": a.num_ctx if a.planner == "llm" else None, "max_repairs": a.max_repairs,
         "decoding": f"temperature 0, seed 0, num_predict {backend.num_predict}" if backend else "deterministic",
+        "llm_prompt_version": __import__("orion.planner.llm", fromlist=["x"]).PROMPT_VERSION if backend else None,
         "prompt_set": data["version"], "n": n, "git_commit": commit, "src_dirty": dirty,
         "run_at": datetime.now(timezone.utc).isoformat(),
         "behaviour_accuracy": f"{sum(r['expect'] == r['got'] for r in rows)}/{n}",
