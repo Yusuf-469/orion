@@ -55,6 +55,8 @@ class OllamaBackend:
         except (TimeoutError, urllib.error.URLError, ConnectionError) as e:
             self.calls.append({"seconds": round(time.monotonic() - t0, 2), "error": f"{type(e).__name__}: {e}"})
             raise LLMBackendError(f"{type(e).__name__}: {e}") from None
+        # Keep the raw reply: every result must be traceable to what the model actually said.
         self.calls.append({"seconds": round(time.monotonic() - t0, 2),
-                           "prompt_tokens": data.get("prompt_eval_count"), "output_tokens": data.get("eval_count")})
+                           "prompt_tokens": data.get("prompt_eval_count"), "output_tokens": data.get("eval_count"),
+                           "done_reason": data.get("done_reason"), "response": data.get("response", "")})
         return data.get("response", "")
