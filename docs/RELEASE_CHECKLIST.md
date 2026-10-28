@@ -5,8 +5,8 @@
 | Portable build (PyInstaller, one folder, windowed) | done | `packaging/build.ps1` -> `dist/ORION-0.1.0-win64.zip`, 220 MB zipped / 539 MB unzipped |
 | Built app self-test, from a copy with Python removed from PATH | **passed 6/6** | `dist/selftest.json` written by the build script (files+verify, safety layer, browser, OCR, UI Automation, learned scorer) |
 | Built app GUI end to end | **passed** | packaged `ORION.exe` driven through its real window: goal "click Export in the canvas demo", dry run off -> its own canvas helper launched, button found by OCR + learned scorer, clicked, `VERIFIED_COMPLETE`; exited with code 0 |
-| `--install-browser` in the built app | partly tested | exit 0 with Chromium already present (registered, no download); the fresh-download path was **not** tested (it would mean deleting the existing browser on the dev PC) |
-| Install on a clean Windows user profile / second machine | **not done** | needs a new Windows account or a VM (a system change; awaiting approval). The Python-free copy test above is the closest substitute |
+| `--install-browser` in the built app | **passed** | on the clean profile: real Chromium download, exit 0 in 26 s, into that user's `%LOCALAPPDATA%\ms-playwright` |
+| Install on a clean Windows user profile | **passed** | new standard user `orion_test` (no Python, no Chromium): unzip -> self-test 5/6 (browser missing, with the fix hint) -> `--install-browser` -> self-test **6/6**; packaged GUI run as that user: canvas click `VERIFIED_COMPLETE`. `artifacts/acceptance_clean_profile.json` (transcribed from session output; raw files were deleted by mistake). Not tested: a second physical machine |
 | Install and user guide | done | `docs/USER_GUIDE.md` |
 | Developer install documented | done | `README.md` |
 | Test suites | passed | offscreen 253 passed; real 20 passed + 1 skipped (hotkey held by another running ORION) |

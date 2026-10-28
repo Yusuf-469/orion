@@ -1,0 +1,77 @@
+{
+ "provenance": "TRANSCRIBED from the console output of this session (2026-10-28/29). The raw files (result.txt, selftest_before_browser.json, selftest_after_browser.json) were deleted by mistake after a failed save; per-check timings and traces were not kept.",
+ "account": "Yusuf\\orion_test: new standard (non-admin) Windows user created by the author; fresh profile",
+ "build": "dist/ORION-0.1.0-win64.zip built from commit 2591ab1 (packaging/build.ps1)",
+ "runner_log": [
+  "23:54:29 user=orion_test profile=C:\\Users\\orion_test",
+  "23:54:32 python on PATH: False",
+  "23:54:32 ms-playwright before: False",
+  "23:54:50 unzipped: True",
+  "23:55:08 selftest 1 exit=1",
+  "23:55:35 install-browser exit=0 seconds=26",
+  "23:55:35 ms-playwright after: .links,chromium-1248,chromium_headless_shell-1248,ffmpeg-1013,winldd-1007",
+  "23:55:45 selftest 2 exit=0",
+  "23:55:45 done"
+ ],
+ "selftest_before_browser": {
+  "ok": false,
+  "frozen": true,
+  "checks": {
+   "files_plan_verify": {
+    "ok": true,
+    "detail": "planned, ran and verified a 2-step file task"
+   },
+   "safety_layer": {
+    "ok": true,
+    "detail": "delete without permission and writing outside the workspace were both refused"
+   },
+   "ocr": {
+    "ok": true,
+    "detail": "local OCR read ['Export Report']"
+   },
+   "ui_automation": {
+    "ok": true,
+    "detail": "UI Automation works (15 top-level windows visible; none were read or touched)"
+   },
+   "grounding_model": {
+    "ok": true,
+    "detail": "learned scorer loaded (grounding_p0.joblib)"
+   },
+   "browser": {
+    "ok": false,
+    "detail": "application_unavailable: browser error: Executable doesn't exist at C:\\Users\\orion_test\\AppData\\Local\\ms-playwright\\... (detail included the hint 'run ORION --install-browser once')"
+   }
+  }
+ },
+ "selftest_after_browser": {
+  "ok": true,
+  "frozen": true,
+  "checks": {
+   "files_plan_verify": {
+    "ok": true,
+    "detail": "planned, ran and verified a 2-step file task"
+   },
+   "safety_layer": {
+    "ok": true,
+    "detail": "delete without permission and writing outside the workspace were both refused"
+   },
+   "ocr": {
+    "ok": true,
+    "detail": "local OCR read ['Export Report']"
+   },
+   "ui_automation": {
+    "ok": true,
+    "detail": "UI Automation works (15 top-level windows visible; none were read or touched)"
+   },
+   "grounding_model": {
+    "ok": true,
+    "detail": "learned scorer loaded (grounding_p0.joblib)"
+   },
+   "browser": {
+    "ok": true,
+    "detail": "read the demo page's table in Chromium, wrote and summarized a CSV"
+   }
+  }
+ },
+ "gui_check": "packaged ORION.exe started as Yusuf\\orion_test (process owner verified) and driven via UI Automation: goal 'click Export in the canvas demo', dry run off -> window showed 'task 1: VERIFIED_COMPLETE (file_contains canvas_clicks.log: text found)'; window closed cleanly"
+}
