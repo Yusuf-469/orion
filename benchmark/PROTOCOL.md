@@ -2,7 +2,7 @@
 
 **Purpose.** Measure whether ORION completes multi-step Windows tasks reliably, asks when it should, blocks what it must, and recovers from failures, and how much its own parts (learned grounding, recovery, planning/verification) contribute.
 
-## Tasks (41, in `benchmark/harness.py`)
+## Tasks (40, in `benchmark/harness.py`)
 | Category | Tasks | What passes |
 |---|---|---|
 | Direct | D1-D6 (file create/copy/read/list, Calculator, canvas click) | the expected file / value / click |
