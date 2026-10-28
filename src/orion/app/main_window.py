@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QPlainTextEdit, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from orion import resources
 from orion.app import hotkey
 from orion.app.confirm import QtConfirmer
 from orion.config import OrionConfig
@@ -69,7 +70,7 @@ def build_registry() -> ToolRegistry:
     return reg
 
 
-DEMO_PAGES = Path(__file__).resolve().parents[3] / "demo" / "pages"
+DEMO_PAGES = resources.path("demo", "pages")
 
 EXAMPLE_GOALS = [
     "save the table from sales.html as report.csv then summarize report.csv into summary.txt "

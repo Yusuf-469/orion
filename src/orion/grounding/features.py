@@ -26,7 +26,9 @@ def _sim(a: str, b: str) -> float:
 
 from pathlib import Path
 
-MODEL_PATH = Path(__file__).resolve().parents[3] / "artifacts" / "models" / "grounding_p0.joblib"
+from orion import resources
+
+MODEL_PATH = resources.path("artifacts", "models", "grounding_p0.joblib")
 _bundle_cache: dict = {}
 
 

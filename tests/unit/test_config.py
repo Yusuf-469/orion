@@ -63,3 +63,12 @@ def test_missing_explicit_path_is_error(tmp_path):
 def test_no_file_gives_defaults(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert load_config() == OrionConfig()
+
+
+def test_example_config_loads_and_keeps_default_abilities():
+    """Regression: the example once listed only 3 permissions, silently dropping Notepad/Calculator/browser."""
+    from orion.config import OrionConfig, load_config
+    root = Path(__file__).resolve().parents[2]
+    cfg = load_config(root / "config" / "orion.example.toml")
+    assert set(cfg.granted_permissions) == set(OrionConfig().granted_permissions)
+    assert cfg.dry_run_default is True

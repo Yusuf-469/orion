@@ -34,3 +34,8 @@ research/**/out/
 # Secrets
 .env
 *.key
+
+# Packaging output
+build/
+dist/
+selftest.json

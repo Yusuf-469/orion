@@ -27,7 +27,7 @@ from orion.tools.files.workspace import rel_display, resolve_in_workspace
 
 CANVAS_TITLE = "ORION Canvas Demo"
 CLICKABLE_WINDOWS = (CANVAS_TITLE,)   # adding an app here needs a safety review
-CANVAS_APP = Path(__file__).resolve().parents[4] / "demo" / "apps" / "canvas_buttons.py"
+CANVAS_APP = "demo/apps/canvas_buttons.py"   # ORION helper script, run via resources.helper_command
 _FRAME_IDS = {"Minimize", "Maximize", "Restore", "Close"}
 
 
@@ -179,9 +179,8 @@ class OpenCanvasDemoTool(Tool[OpenCanvasArgs, OpenCanvasOut]):
         with _uia() as auto:
             if any(w.Name == CANVAS_TITLE for w in auto.GetRootControl().GetChildren()):
                 return OpenCanvasOut(log=rel_display(ctx.workspace, log), evidence="the demo app is already open")
-            exe = Path(sys.executable).with_name("pythonw.exe")
-            subprocess.Popen([str(exe if exe.exists() else sys.executable), str(CANVAS_APP), str(log)],
-                             close_fds=True)
+            from orion import resources
+            subprocess.Popen(resources.helper_command(CANVAS_APP, str(log)), close_fds=True)
             while time.monotonic() < ctx.deadline - 0.5:
                 if any(w.Name == CANVAS_TITLE for w in auto.GetRootControl().GetChildren()):
                     return OpenCanvasOut(log=rel_display(ctx.workspace, log),

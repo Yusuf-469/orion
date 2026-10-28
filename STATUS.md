@@ -78,13 +78,15 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Grounding on real apps (Calculator, Paint, Character Map; ORION's own windows, nothing clicked) | measured | `research/reports/grounding_real_v1.md`: 0 wrong clicks with metadata; found + fixed nested-element bug (`collapse_nested`, learned 68% -> 79% correct); rules 87.5% beat learned on real apps (synthetic-to-real gap); OCR alone finds ~10% (icons) |
 | **Benchmark v1 (Stage 9a)**: 40 tasks x 5 runs, C1/C2/C3/A_norec | verified (real, 435 runs) | `benchmark/REPORT_v1.md`: ORION 200/200, 0 safety violations; without recovery 40% on failure tasks, script 91% overall; learned vs rule grounding equal on canvas (50/50 each); 0 false "complete" claims |
 | "Will not do" notice (submit/send/post/buy/pay requests) | implemented (unit tests) | validator `will_not_do` warning shown in the window; added after benchmark task S7 |
+| **Portable release build (Stage 9b)** | verified (built app) | `packaging/build.ps1`: zip 220 MB; built app self-test 6/6 with no Python on PATH; packaged GUI driven end to end (canvas click VERIFIED_COMPLETE). Not done: clean Windows profile / VM install, code signing. `docs/RELEASE_CHECKLIST.md` |
+| User guide, claims audit | done | `docs/USER_GUIDE.md`; README and example config corrected (example config was silently dropping 2 permissions) |
 | GPU stack | installed (approved) | torch 2.11.0+cu128 on RTX 4060, transformers 5.21, peft 0.21, scikit-learn 1.9.1, SigLIP base (Apache-2.0) |
 
 ## Test totals (2026-10-24, end of session)
 `-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
 ## RESUME HERE (Stage 6 core done)
-2026-10-28: learned grounding scorer live (90% correct on unseen layouts, fewer wrong clicks than rules); conformal analysis, frozen and fine-tuned SigLIP measured (not shipped); "did you mean A or B?" live. Real-app grounding measured; benchmark v1 done (Stage 9a). Latest totals: `-m "not real"` 246 passed, `-m real` 20 passed + 1 skipped (hotkey held by a running ORION). Next: Stage 9b (gate C) packaging (PyInstaller, clean-profile install), user guide, final report; follow-up: let task outcomes use tools' own checks (Calculator, form fill) instead of "unverified". Open: human-eye checks M7/M9.
+2026-10-28: learned grounding scorer live (90% correct on unseen layouts, fewer wrong clicks than rules); conformal analysis, frozen and fine-tuned SigLIP measured (not shipped); "did you mean A or B?" live. Real-app grounding measured; benchmark v1 done (Stage 9a); portable release built and verified (Stage 9b, gate C pending). Latest totals: `-m "not real"` 253 passed, `-m real` 20 passed + 1 skipped (hotkey held by a running ORION). Gate C open items: clean-profile/VM install (needs approval), licence notices in the zip, final report and slides, two demo rehearsals + fallback recording (author). Follow-up: let task outcomes use tools' own checks (Calculator, form fill) instead of "unverified". Open: human-eye checks M7/M9.
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.
