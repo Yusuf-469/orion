@@ -105,6 +105,12 @@ class ToolRuntime:
         decision = self.policy.decide(spec)
         if decision.decision is Decision.DENY:
             return _fail(tid, ErrorCode.PERMISSION_DENIED, decision.reason, decision=decision.decision)
+        precheck = getattr(tool, "precheck", None)   # reject a malformed call before the user is ever asked
+        if precheck is not None:
+            try:
+                precheck(args)
+            except ToolError as e:
+                return _fail(tid, e.code, e.message, decision=decision.decision)
         if decision.decision is Decision.CONFIRM:
             describe = getattr(tool, "describe", None)
             action, consequence = describe(args) if describe else (f"run {tid}", decision.reason)

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Findr search (ORION test site)</title>
+<style>body{font-family:Segoe UI,sans-serif;max-width:760px;margin:30px auto}.result{margin:18px 0}.result a{font-size:18px}
+.snippet{color:#444}</style></head>
+<body><main>
+<h1>Findr</h1>
+<form action="search.html"><input name="q" aria-label="Search" size="50"><button>Search</button></form>
+<div id="results"></div>
+</main>
+<script>
+const PAGES = [
+  {t: "Aurora X1 wireless headphones - official specs", u: "products/aurora-x1.html",
+   s: "Aurora X1: 38 h battery, adaptive noise cancelling, 250 g, Bluetooth 5.3. Price 249 USD.", k: "aurora x1 headphones"},
+  {t: "Nimbus Pro wireless headphones - product page", u: "products/nimbus-pro.html",
+   s: "Nimbus Pro: 30 h battery, studio sound, 290 g, multipoint. Price 199 USD.", k: "nimbus pro headphones"},
+  {t: "Aurora X1 vs Nimbus Pro: our long-term review", u: "products/review.html",
+   s: "We used both for a month. Comfort, calls, noise cancelling and value compared.", k: "aurora x1 nimbus pro review compare headphones"},
+  {t: "Community feedback form", u: "form/feedback.html", s: "Tell us about your experience.", k: "feedback form survey"},
+  {t: "Openings at Northwind Labs", u: "jobs/index.html", s: "Junior ML engineer, Python developer, QA intern.", k: "jobs openings careers python ml engineer"},
+];
+const q = (new URLSearchParams(location.search).get("q") || "").toLowerCase();
+document.querySelector("[name=q]").value = q;
+const words = q.split(/\s+/).filter(Boolean);
+const hits = PAGES.map(p => [p, words.filter(w => p.k.includes(w) || p.t.toLowerCase().includes(w)).length])
+                  .filter(([p, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+document.getElementById("results").innerHTML = hits.length ? hits.map(([p]) =>
+  `<div class="result"><a class="result__a" href="${p.u}">${p.t}</a><p class="result__snippet">${p.s}</p></div>`).join("")
+  : "<p>No results.</p>";
+</script>
+</body></html>

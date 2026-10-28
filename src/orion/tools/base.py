@@ -36,6 +36,7 @@ class Permission(StrEnum):
     APP_LAUNCH = "app.launch"
     APP_CONTROL = "app.control"      # read/write text inside an app window ORION opened
     BROWSER_READ = "browser.read"    # open allowlisted local pages and read them
+    BROWSER_WEB = "browser.web"      # use real websites in ORION's own browser (sending always asks first)
 
 
 @dataclass(frozen=True)

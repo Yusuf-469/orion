@@ -40,3 +40,6 @@ selftest.json
 
 # Local tooling config (not part of ORION)
 CLAUDE.md
+
+# Agent trial traces (raw model replies; kept local)
+research/agent_eval/*.json
