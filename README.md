@@ -18,5 +18,15 @@ Remove-Item Env:QT_QPA_PLATFORM;  .\.venv\Scripts\python.exe -m pytest -m real
 ```
 Markers: `mock` (simulated actions), `real` (opens an ORION window on the desktop), `safety`, `ui`.
 
+## Visual grounding model (optional, ~20 min, CPU)
+ORION clicks by what is visible. Without a trained model it uses rules; with one it is right far more often
+on unfamiliar layouts with fewer wrong clicks. Build it locally (weights are not committed):
+```powershell
+.\.venv\Scripts\python.exe research\data_collection\render_synth.py --out research\data_collection\out\v1 --n 600
+.\.venv\Scripts\python.exe research\training\train_grounding.py --data research\data_collection\out\v1 --model-out artifacts\models\grounding_p0_candidate.joblib
+# promote only if the printed P0 result beats B4 on wrong clicks and correct answers:
+Copy-Item artifacts\models\grounding_p0_candidate.joblib artifacts\models\grounding_p0.joblib
+```
+
 ## Config
 Copy `config/orion.example.toml` to `orion.toml`. Unknown keys are rejected.

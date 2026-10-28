@@ -1,0 +1,153 @@
+{
+  "data": "research\\data_collection\\out\\v1",
+  "data_sha256_16": "b9406f2afc7e206d",
+  "git_commit": "35c784e",
+  "pages": {
+    "train": 320,
+    "val": 80,
+    "test_heldout_families": 200
+  },
+  "test_families": [
+    "sidebar_nav",
+    "wizard"
+  ],
+  "train_rows": 115300,
+  "positives": 4863,
+  "abstain_threshold": 0.68,
+  "ambiguity_margin": 0.6,
+  "results": {
+    "val": [
+      {
+        "method": "B1 metadata only (rules)",
+        "n": 1478,
+        "accuracy": 0.6806,
+        "wrong_click_rate": 0.0108,
+        "missed_rate": 0.3085,
+        "wrong_clicks_by_case": {
+          "duplicate_label": 15,
+          "hidden": 14,
+          "disabled": 4,
+          "icon_only": 1,
+          "non_english": 7,
+          "ambiguous": 1,
+          "missing": 1
+        }
+      },
+      {
+        "method": "B2 OCR only (rules)",
+        "n": 1478,
+        "accuracy": 0.4736,
+        "wrong_click_rate": 0.0886,
+        "missed_rate": 0.4378,
+        "wrong_clicks_by_case": {
+          "non_english": 60,
+          "icon_only": 28,
+          "disabled": 24,
+          "duplicate_label": 88,
+          "ambiguous": 38,
+          "hidden": 15,
+          "plain": 18
+        }
+      },
+      {
+        "method": "B4 metadata + OCR (rules, current)",
+        "n": 1478,
+        "accuracy": 0.6434,
+        "wrong_click_rate": 0.0115,
+        "missed_rate": 0.3451,
+        "wrong_clicks_by_case": {
+          "duplicate_label": 16,
+          "hidden": 16,
+          "disabled": 4,
+          "icon_only": 1,
+          "non_english": 7,
+          "ambiguous": 1
+        }
+      },
+      {
+        "method": "P0 learned scorer",
+        "n": 1478,
+        "accuracy": 0.91,
+        "wrong_click_rate": 0.0115,
+        "missed_rate": 0.0785,
+        "wrong_clicks_by_case": {
+          "disabled": 2,
+          "duplicate_label": 17,
+          "hidden": 4,
+          "non_english": 11,
+          "ambiguous": 13,
+          "icon_only": 2
+        }
+      }
+    ],
+    "test": [
+      {
+        "method": "B1 metadata only (rules)",
+        "n": 3960,
+        "accuracy": 0.6775,
+        "wrong_click_rate": 0.0091,
+        "missed_rate": 0.3134,
+        "wrong_clicks_by_case": {
+          "non_english": 25,
+          "icon_only": 5,
+          "disabled": 7,
+          "duplicate_label": 32,
+          "hidden": 31,
+          "missing": 4,
+          "ambiguous": 1
+        }
+      },
+      {
+        "method": "B2 OCR only (rules)",
+        "n": 3960,
+        "accuracy": 0.4816,
+        "wrong_click_rate": 0.1023,
+        "missed_rate": 0.4162,
+        "wrong_clicks_by_case": {
+          "non_english": 139,
+          "icon_only": 76,
+          "duplicate_label": 253,
+          "ambiguous": 128,
+          "disabled": 54,
+          "hidden": 21,
+          "plain": 87
+        }
+      },
+      {
+        "method": "B4 metadata + OCR (rules, current)",
+        "n": 3960,
+        "accuracy": 0.6308,
+        "wrong_click_rate": 0.0104,
+        "missed_rate": 0.3588,
+        "wrong_clicks_by_case": {
+          "non_english": 30,
+          "icon_only": 5,
+          "disabled": 6,
+          "duplicate_label": 30,
+          "hidden": 35,
+          "missing": 5,
+          "ambiguous": 1
+        }
+      },
+      {
+        "method": "P0 learned scorer",
+        "n": 3960,
+        "accuracy": 0.9035,
+        "wrong_click_rate": 0.0083,
+        "missed_rate": 0.0881,
+        "wrong_clicks_by_case": {
+          "non_english": 24,
+          "duplicate_label": 33,
+          "ambiguous": 31,
+          "icon_only": 5,
+          "disabled": 3,
+          "hidden": 2
+        }
+      }
+    ]
+  },
+  "test_accuracy_gain_P0_vs_B4_95ci": [
+    0.2576,
+    0.2871
+  ]
+}

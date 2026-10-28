@@ -57,6 +57,8 @@ def test_clicks_a_button_uia_cannot_see(orion):
     steps = store.list_steps(tid)
     assert out is Outcome.VERIFIED_COMPLETE, [s["evidence"] for s in steps]
     assert "via ocr" in steps[-1]["evidence"]
+    from orion.grounding.features import load_model
+    assert ("learned score" if load_model() else "rules score") in steps[-1]["evidence"]
     assert (ws / "canvas_clicks.log").read_text(encoding="utf-8").strip().endswith("clicked Export")
     print("\n  ", steps[-1]["evidence"])
 

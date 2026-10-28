@@ -45,12 +45,32 @@ def hit(c: Candidate | None, target_box: list | None) -> bool:
     return target_box[0] <= x <= target_box[2] and target_box[1] <= y <= target_box[3]
 
 
+def variants(s: dict, ins: dict) -> list[dict]:
+    """The generator's phrasing plus the shorter ways people actually ask:
+    'the X button' and just 'X'. A shorter phrasing is ambiguous (target None) when another
+    visible element shares the label (and role, for 'the X button')."""
+    out = [ins]
+    if not ins["target_id"]:
+        return out
+    els = {e["id"]: e for e in s["elements"]}
+    t = els[ins["target_id"]]
+    visible = [e for e in s["elements"] if not e["hidden"] and e["id"] != t["id"]]
+    same_label = [e for e in visible if e["label"] == t["label"]]
+    same_role = [e for e in same_label if e["role"] == t["role"]]
+    out.append({"text": f"the {t['label']} {t['role']}", "target_id": None if same_role else t["id"],
+                "flags": ins["flags"] + (["ambiguous"] if same_role else [])})
+    out.append({"text": t["label"], "target_id": None if same_label else t["id"],
+                "flags": ins["flags"] + (["ambiguous"] if same_label else [])})
+    return out
+
+
 def examples(samples: list[dict]):
     for s in samples:
         merged = candidates(s)
-        for ins in s["instructions"]:
-            tb = s["boxes"].get(ins["target_id"]) if ins["target_id"] else None
-            yield s, ins, tb, merged
+        for base in s["instructions"]:
+            for ins in variants(s, base):
+                tb = s["boxes"].get(ins["target_id"]) if ins["target_id"] else None
+                yield s, ins, tb, merged
 
 
 def outcome(pick: Candidate | None, tb) -> str:
@@ -63,15 +83,18 @@ def outcome(pick: Candidate | None, tb) -> str:
 
 def evaluate(name: str, samples, chooser) -> dict:
     counts = {"correct": 0, "wrong_click": 0, "missed": 0}
-    per = []
+    per, wrong_by_flag = [], {}
     for s, ins, tb, merged in examples(samples):
         o = outcome(chooser(s, ins, merged), tb)
         counts[o] += 1
         per.append(o == "correct")
+        if o == "wrong_click":
+            for f in ins["flags"] or ["plain"]:
+                wrong_by_flag[f] = wrong_by_flag.get(f, 0) + 1
     n = sum(counts.values())
     return {"method": name, "n": n, "accuracy": round(counts["correct"] / n, 4),
             "wrong_click_rate": round(counts["wrong_click"] / n, 4),
-            "missed_rate": round(counts["missed"] / n, 4), "_per": per}
+            "missed_rate": round(counts["missed"] / n, 4), "wrong_clicks_by_case": wrong_by_flag, "_per": per}
 
 
 def rule(use_meta, use_ocr):
@@ -88,19 +111,23 @@ def best_scores(model, samples) -> dict:
         merged = candidates(s)
         if not merged:
             continue
-        blocks = [featurize(ins["text"], merged, W, H) for ins in s["instructions"]]
+        all_ins = [v for base in s["instructions"] for v in variants(s, base)]
+        blocks = [featurize(ins["text"], merged, W, H) for ins in all_ins]
         probs = model.predict_proba(np.array([r for b in blocks for r in b]))[:, 1]
-        for k, ins in enumerate(s["instructions"]):
+        for k, ins in enumerate(all_ins):
             p = probs[k * len(merged):(k + 1) * len(merged)]
-            i = int(p.argmax())
-            out[(s["sample_id"], ins["text"])] = (float(p[i]), merged[i])
+            order = p.argsort()[::-1]
+            i = int(order[0])
+            # runner-up = best candidate somewhere else on screen (not overlapping the winner)
+            j = next((int(o) for o in order[1:] if merged[int(o)].box.iou(merged[i].box) < 0.3), None)
+            out[(s["sample_id"], ins["text"])] = (float(p[i]), merged[i], float(p[j]) if j is not None else 0.0)
     return out
 
 
-def learned(cache: dict, tau: float):
+def learned(cache: dict, tau: float, margin: float = 0.0):
     def choose(s, ins, merged):
-        p, c = cache.get((s["sample_id"], ins["text"]), (0.0, None))
-        return c if p >= tau else None
+        p, c, p2 = cache.get((s["sample_id"], ins["text"]), (0.0, None, 0.0))
+        return c if (p >= tau and p - p2 >= margin) else None
     return choose
 
 
@@ -135,21 +162,23 @@ def main() -> int:
     model = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.08, random_state=0)
     model.fit(np.array(X), np.array(y))
 
-    # Abstain threshold from validation only: reward correct answers, punish wrong clicks 3x.
+    # Operating point from validation only. Product rule: never more wrong clicks than the current
+    # rules (B4) on validation; within that budget, as many correct answers as possible.
     val_cache, test_cache = best_scores(model, val), best_scores(model, test)
-    best_tau, best_val = 0.5, -1e9
-    for tau in [i / 100 for i in range(20, 96, 2)]:
-        r = evaluate("p0", val, learned(val_cache, tau))
-        v = r["accuracy"] - 3 * r["wrong_click_rate"]
-        if v > best_val:
-            best_tau, best_val = tau, v
+    budget = evaluate("b4", val, rule(True, True))["wrong_click_rate"]
+    best_tau, best_margin, best_acc = 0.95, 0.6, -1.0
+    for tau in [i / 100 for i in range(20, 100, 2)]:
+        for margin in (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8):
+            r = evaluate("p0", val, learned(val_cache, tau, margin))
+            if r["wrong_click_rate"] <= budget and r["accuracy"] > best_acc:
+                best_tau, best_margin, best_acc = tau, margin, r["accuracy"]
 
     rules = [("B1 metadata only (rules)", rule(True, False)), ("B2 OCR only (rules)", rule(False, True)),
              ("B4 metadata + OCR (rules, current)", rule(True, True))]
     results = {"val": [evaluate(n, val, f) for n, f in rules] + [evaluate("P0 learned scorer", val,
-                                                                         learned(val_cache, best_tau))],
+                                                                         learned(val_cache, best_tau, best_margin))],
                "test": [evaluate(n, test, f) for n, f in rules] + [evaluate("P0 learned scorer", test,
-                                                                           learned(test_cache, best_tau))]}
+                                                                           learned(test_cache, best_tau, best_margin))]}
     lo, hi = bootstrap_diff(results["test"][3]["_per"], results["test"][2]["_per"])
     for split in results.values():
         for r in split:
@@ -158,19 +187,19 @@ def main() -> int:
     Path(a.model_out).parent.mkdir(parents=True, exist_ok=True)
     data_hash = hashlib.sha256(raw).hexdigest()[:16]
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    joblib.dump({"model": model, "tau": best_tau, "features": FEATURES, "data_sha256": data_hash,
+    joblib.dump({"model": model, "tau": best_tau, "margin": best_margin, "features": FEATURES, "data_sha256": data_hash,
                  "commit": commit}, a.model_out)
     report = {"data": a.data, "data_sha256_16": data_hash, "git_commit": commit,
               "pages": {"train": len(train), "val": len(val), "test_heldout_families": len(test)},
               "test_families": sorted(TEST_FAMILIES), "train_rows": len(y), "positives": int(sum(y)),
-              "abstain_threshold": best_tau, "results": results,
+              "abstain_threshold": best_tau, "ambiguity_margin": best_margin, "results": results,
               "test_accuracy_gain_P0_vs_B4_95ci": [lo, hi]}
     Path(a.report).parent.mkdir(parents=True, exist_ok=True)
     Path(a.report).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for r in results["test"]:
         print(f"TEST {r['method']:<36} correct {r['accuracy']:.1%}  wrong clicks {r['wrong_click_rate']:.1%}  "
-              f"missed {r['missed_rate']:.1%}  (n={r['n']})")
-    print(f"P0 - B4 accuracy on held-out families: 95% CI [{lo:+.1%}, {hi:+.1%}]; abstain threshold {best_tau}")
+              f"missed {r['missed_rate']:.1%}  (n={r['n']})  wrong by case: {r['wrong_clicks_by_case']}")
+    print(f"P0 - B4 accuracy on held-out families: 95% CI [{lo:+.1%}, {hi:+.1%}]; abstain threshold {best_tau}, ambiguity margin {best_margin}")
     return 0
 
 

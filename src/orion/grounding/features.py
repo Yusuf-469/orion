@@ -64,9 +64,12 @@ def locate_learned(description: str, cands: list[Candidate], bundle: dict, windo
     if p[i] < bundle["tau"]:
         return Located(None, float(p[i]), f"not confident enough (best '{cands[i].text}' {p[i]:.2f} "
                                           f"< {bundle['tau']:.2f}); not clicking")
-    runner = cands[int(order[1])] if len(order) > 1 else None
+    j = next((int(o) for o in order[1:] if cands[int(o)].box.iou(cands[i].box) < 0.3), None)
+    if j is not None and p[i] - p[j] < bundle.get("margin", 0.0):
+        return Located(None, float(p[i]), f"ambiguous: '{cands[i].text}' ({p[i]:.2f}) and '{cands[j].text}' "
+                                          f"({p[j]:.2f}) are both likely; not clicking", cands[j])
     return Located(cands[i], float(p[i]), f"found '{cands[i].text}' via {cands[i].source} "
-                                          f"(learned score {p[i]:.2f})", runner)
+                                          f"(learned score {p[i]:.2f})", cands[j] if j is not None else None)
 
 
 def featurize(description: str, cands: list[Candidate], width: int, height: int) -> list[list[float]]:
