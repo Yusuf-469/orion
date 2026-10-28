@@ -37,9 +37,15 @@ def load_model(path: Path | str = MODEL_PATH):
         return None
     key = (str(p.resolve()), p.stat().st_mtime)
     if key not in _bundle_cache:
-        import joblib
+        try:
+            import joblib
+            bundle = joblib.load(p)
+        except Exception as e:   # missing scikit-learn/joblib or an unreadable file: fall back to rules
+            import logging
+            logging.getLogger("orion.grounding").warning("grounding model not usable (%s); using rules", e)
+            return None
         _bundle_cache.clear()
-        _bundle_cache[key] = joblib.load(p)
+        _bundle_cache[key] = bundle
     return _bundle_cache[key]
 
 

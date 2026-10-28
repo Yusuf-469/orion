@@ -17,6 +17,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-timeout>=2.3"]
+# Training the grounding scorer (sklearn) and the visual model (torch: install the CUDA build from
+# https://download.pytorch.org/whl/cu128 for the RTX GPU). Not needed to run ORION.
+ml = ["scikit-learn>=1.5", "joblib>=1.4", "torch>=2.4", "torchvision>=0.19", "transformers>=4.45",
+      "peft>=0.12", "sentencepiece>=0.2", "protobuf>=4"]
 
 [project.scripts]
 orion = "orion.app.main:main"

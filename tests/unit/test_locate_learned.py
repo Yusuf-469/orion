@@ -37,6 +37,14 @@ def test_picks_best_and_uses_window_relative_coordinates():
     assert (rel_x >= 0).all() and (rel_x <= 1).all()   # boxes were made relative to the window
 
 
+def test_unreadable_model_file_falls_back_to_rules(tmp_path):
+    from orion.grounding.features import load_model
+    bad = tmp_path / "broken.joblib"
+    bad.write_bytes(b"not a model")
+    assert load_model(bad) is None
+    assert load_model(tmp_path / "missing.joblib") is None
+
+
 def test_abstains_below_threshold():
     r = locate_learned("Delete", cands(), {"model": SimModel(), "tau": 0.9}, Box(0, 0, 800, 600))
     assert r.candidate is None and "not confident enough" in r.reason
