@@ -134,8 +134,10 @@ class MainWindow(QMainWindow):
         self.planner = self._make_planner()
         self.last_goal_task: int | None = None
         self._planned.connect(self._on_planned)
+        from orion.recovery import RecoveryEngine
         self.graph = GraphRunner(store, self.kill_switch, self.tool_runtime, Verifier(cfg.workspace_dir),
-                                 on_event=self._bridge.event.emit)
+                                 on_event=self._bridge.event.emit,
+                                 recovery=RecoveryEngine(self.tool_runtime, self.confirmer))
 
         self.setWindowTitle("ORION")
         self.resize(1100, 760)

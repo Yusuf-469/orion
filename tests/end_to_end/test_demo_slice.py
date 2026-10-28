@@ -11,6 +11,11 @@ from pathlib import Path
 
 import pytest
 
+import uuid
+
+P = f"orion-test-{uuid.uuid4().hex[:6]}"   # unique: never collides with the user's tabs or old runs
+SUMMARY, NOTE = f"{P}-summary.txt", f"{P}-note.txt"
+
 pytestmark = [pytest.mark.real, pytest.mark.skipif(sys.platform != "win32", reason="Windows only")]
 
 DEMO = Path(__file__).resolve().parents[2] / "demo" / "pages" / "sales.html"
@@ -38,7 +43,7 @@ def orion(tmp_path):
     ks = KillSwitch()
     gr = GraphRunner(store, ks, rt, Verifier(ws))
     yield gr, store, ks, ws
-    for f in ("summary.txt", "note.txt"):
+    for f in (SUMMARY, NOTE):
         rt.execute(ToolCall(tool_id="notepad.close_tab", args={"path": f}), CancelToken())
     if not had_window:
         for w in auto.GetRootControl().GetChildren():
@@ -61,12 +66,12 @@ def test_demo_slice_table_to_notepad(orion):
     from orion.planner.schemas import Outcome
     gr, store, ks, ws = orion
     tid, outcome = run_goal(orion, "save the table from sales.html as report.csv then summarize report.csv "
-                                   "into summary.txt then open summary.txt in notepad")
+                                   f"into {SUMMARY} then open {SUMMARY} in notepad")
     steps = {s["step_key"]: s for s in store.list_steps(tid)}
     assert outcome is Outcome.VERIFIED_COMPLETE, {k: (s["status"], s["evidence"]) for k, s in steps.items()}
     rows = list(csv.reader(open(ws / "report.csv", encoding="utf-8")))
     assert rows[0] == ["Region", "Units", "Revenue"] and len(rows) == 6
-    summary = (ws / "summary.txt").read_text(encoding="utf-8")
+    summary = (ws / SUMMARY).read_text(encoding="utf-8")
     assert "Rows: 5" in summary and "Revenue: total 163500" in summary
     assert "screen matches disk" in steps["s4"]["evidence"]
     print("\n" + "\n".join(f"  {k}: {s['evidence'][:150]}" for k, s in steps.items()))
@@ -75,8 +80,8 @@ def test_demo_slice_table_to_notepad(orion):
 def test_type_into_notepad_and_save(orion):
     from orion.planner.schemas import Outcome
     gr, store, ks, ws = orion
-    (ws / "note.txt").write_text("old text", encoding="utf-8")
-    tid, outcome = run_goal(orion, 'type "Meeting moved to 4 pm" into note.txt in notepad')
+    (ws / NOTE).write_text("old text", encoding="utf-8")
+    tid, outcome = run_goal(orion, f'type "Meeting moved to 4 pm" into {NOTE} in notepad')
     assert outcome is Outcome.VERIFIED_COMPLETE, [s["evidence"] for s in store.list_steps(tid)]
-    assert (ws / "note.txt").read_text(encoding="utf-8-sig").strip() == "Meeting moved to 4 pm"
+    assert (ws / NOTE).read_text(encoding="utf-8-sig").strip() == "Meeting moved to 4 pm"
     assert (ws / ".orion_backups").is_dir()

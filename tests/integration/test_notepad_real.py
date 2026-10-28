@@ -9,6 +9,10 @@ from pathlib import Path
 
 import pytest
 
+import uuid
+
+P = f"orion-test-{uuid.uuid4().hex[:6]}"   # unique: never collides with the user's tabs or old runs
+
 pytestmark = [pytest.mark.real, pytest.mark.skipif(sys.platform != "win32", reason="Windows only")]
 
 
@@ -46,7 +50,7 @@ def call(rt, tool, **args):
 
 def test_open_read_set_save_close(env):
     rt, ws = env
-    f = ws / "orion_np_test.txt"
+    f = ws / f"{P}-np.txt"
     f.write_text("first line", encoding="utf-8")
     r = call(rt, "notepad.open_file", path=f.name)
     assert r.ok, r.evidence
@@ -62,10 +66,30 @@ def test_open_read_set_save_close(env):
     assert not call(rt, "notepad.read_text", path=f.name).ok   # tab gone: guard refuses
 
 
+def test_tab_matching_is_exact():
+    from orion.tools.windows.notepad import _tab_is
+    assert _tab_is("note.txt. Unmodified.", "note.txt")
+    assert _tab_is("Note.TXT. Modified.", "note.txt")
+    assert not _tab_is("my note.txt. Unmodified.", "note.txt")
+    assert not _tab_is("note.txt.bak. Unmodified.", "note.txt")
+
+
+def test_reopening_selects_existing_tab_no_duplicate(env):
+    import uiautomation as auto
+    from orion.tools.windows.notepad import find_tabs
+    rt, ws = env
+    (ws / f"{P}-dup.txt").write_text("x", encoding="utf-8")
+    assert call(rt, "notepad.open_file", path=f"{P}-dup.txt").ok
+    r = call(rt, "notepad.open_file", path=f"{P}-dup.txt")
+    assert r.ok and "selected its existing tab" in r.evidence
+    with auto.UIAutomationInitializerInThread():
+        assert len(find_tabs(auto, f"{P}-dup.txt")) == 1
+
+
 def test_guard_refuses_files_not_open(env):
     rt, ws = env
-    (ws / "never_opened.txt").write_text("x")
-    r = call(rt, "notepad.read_text", path="never_opened.txt")
+    (ws / f"{P}-never.txt").write_text("x")
+    r = call(rt, "notepad.read_text", path=f"{P}-never.txt")
     assert not r.ok and "will not read other tabs" in r.evidence
-    r = call(rt, "notepad.set_text", path="never_opened.txt", text="y")
-    assert not r.ok and (ws / "never_opened.txt").read_text() == "x"
+    r = call(rt, "notepad.set_text", path=f"{P}-never.txt", text="y")
+    assert not r.ok and (ws / f"{P}-never.txt").read_text() == "x"

@@ -45,11 +45,12 @@ _BAD_DEP = {Status.FAILED, Status.BLOCKED, Status.NEEDS_REVIEW, Status.CANCELLED
 
 class GraphRunner:
     def __init__(self, store: TaskStore, kill_switch: KillSwitch, runtime: ToolRuntime, verifier: Verifier,
-                 on_event: Callable[[dict[str, Any]], None] | None = None):
+                 on_event: Callable[[dict[str, Any]], None] | None = None, recovery=None):
         self.store = store
         self.kill_switch = kill_switch
         self.runtime = runtime
         self.verifier = verifier
+        self.recovery = recovery   # optional RecoveryEngine; one recovery attempt per step
         self.on_event = on_event or (lambda e: None)
         self.executed: list[tuple[int, str, str]] = []   # (task_id, step_key, action_id) for tests/metrics
 
@@ -212,11 +213,25 @@ class GraphRunner:
         self.executed.append((task_id, step.id, action_id))
         self._emit(task_id, "INFO", "step_started", f"{step.id}: {step.description} [{step.tool_id}]")
         r = self.runtime.execute(ToolCall(tool_id=step.tool_id, args=args), token)
+        recovered = ""
+        rec = self.recovery.propose(step.tool_id, args, r) if self.recovery else None
+        if rec is not None:
+            self._emit(task_id, "WARNING", "recovery", f"{step.id}: {r.evidence} -> trying to {rec.description}")
+            fixed, how = self.recovery.apply(rec, token)
+            self._emit(task_id, "INFO" if fixed else "WARNING", "recovery",
+                       f"{step.id}: recovery {'worked' if fixed else 'not applied'}: {how}")
+            if fixed and not token.is_cancelled:
+                r = self.runtime.execute(ToolCall(tool_id=step.tool_id, args=args), token)
+                recovered = f"recovered ({how}); "
+            elif not fixed:
+                self.store.set_step_status(sid, Status.BLOCKED, f"{r.evidence}; {how}")
+                self._emit(task_id, "WARNING", "step_blocked", f"{step.id} blocked: {how}")
+                return token.is_cancelled
         self.store.set_step_output(sid, r.output)
 
         if r.ok:
             ok, res = self.verifier.check_all(step.postconditions)
-            ev = r.evidence + ("" if not res else " | verified: " + "; ".join(x.evidence for x in res))
+            ev = recovered + r.evidence + ("" if not res else " | verified: " + "; ".join(x.evidence for x in res))
             if ok:
                 self.store.set_step_status(sid, Status.SUCCEEDED, ev)
                 self._emit(task_id, "INFO", "step_done", f"{step.id}: {ev}")
