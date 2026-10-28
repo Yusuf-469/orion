@@ -29,6 +29,17 @@ from orion.grounding.screen import Box, OcrWord
 
 TEST_FAMILIES = {"sidebar_nav", "wizard"}
 W, H = 1280, 800
+VIS: dict | None = None   # SigLIP similarities (embed_siglip.py) when --visual is given
+
+
+def feat(s: dict, text: str, merged: list) -> list[list[float]]:
+    rows = featurize(text, merged, W, H)
+    if VIS is None:
+        return rows
+    from orion.grounding.features import add_visual
+    from orion.grounding.locate import parse_instruction
+    v = VIS.get(f"{s['sample_id']}|{parse_instruction(text)[0] or 'unknown'}")
+    return add_visual(rows, list(v) if v is not None else [0.0] * len(merged))
 
 
 def candidates(sample: dict, use_meta=True, use_ocr=True) -> list[Candidate]:
@@ -112,7 +123,7 @@ def best_scores(model, samples) -> dict:
         if not merged:
             continue
         all_ins = [v for base in s["instructions"] for v in variants(s, base)]
-        blocks = [featurize(ins["text"], merged, W, H) for ins in all_ins]
+        blocks = [feat(s, ins["text"], merged) for ins in all_ins]
         probs = model.predict_proba(np.array([r for b in blocks for r in b]))[:, 1]
         for k, ins in enumerate(all_ins):
             p = probs[k * len(merged):(k + 1) * len(merged)]
@@ -140,7 +151,7 @@ def all_scores(model, samples) -> list[tuple]:
             continue
         all_ins = [v for base in s["instructions"] for v in variants(s, base)]
         probs = model.predict_proba(np.array([r for ins in all_ins
-                                              for r in featurize(ins["text"], merged, W, H)]))[:, 1]
+                                              for r in feat(s, ins["text"], merged)]))[:, 1]
         for k, ins in enumerate(all_ins):
             tb = s["boxes"].get(ins["target_id"]) if ins["target_id"] else None
             out.append((probs[k * len(merged):(k + 1) * len(merged)], merged, tb))
@@ -161,6 +172,8 @@ def conformal(cal: list[tuple], test: list[tuple], alpha: float) -> dict:
             true = [p[i] for i, c in enumerate(cands) if hit(c, tb)]
             scores.append(1 - max(true) if true else 1.0)
     n = len(scores)
+    if n < 20 or not test:
+        return {"alpha": alpha, "skipped": f"too little data (calibration n={n}, test n={len(test)})"}
     qhat = float(np.quantile(scores, min(1.0, np.ceil((n + 1) * (1 - alpha)) / n), method="higher"))
     covered = total = 0
     sizes, counts = [], {"correct": 0, "wrong_click": 0, "missed": 0}
@@ -198,7 +211,11 @@ def main() -> int:
     ap.add_argument("--data", required=True)
     ap.add_argument("--model-out", default="artifacts/models/grounding_p0.joblib")
     ap.add_argument("--report", default="research/reports/grounding_p0_v1.json")
+    ap.add_argument("--visual", action="store_true", help="add frozen SigLIP similarity features")
     a = ap.parse_args()
+    global VIS
+    if a.visual:
+        VIS = joblib.load(Path(a.data) / "siglip_sims.joblib")
     raw = Path(a.data, "samples.jsonl").read_bytes()
     samples = [json.loads(l) for l in raw.decode("utf-8").splitlines()]
     test = [s for s in samples if s["family"] in TEST_FAMILIES]
@@ -208,7 +225,7 @@ def main() -> int:
 
     X, y = [], []
     for s, ins, tb, merged in examples(train):
-        for c, row in zip(merged, featurize(ins["text"], merged, W, H)):
+        for c, row in zip(merged, feat(s, ins["text"], merged)):
             X.append(row)
             y.append(int(hit(c, tb)))
     model = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.08, random_state=0)
@@ -246,7 +263,7 @@ def main() -> int:
     Path(a.model_out).parent.mkdir(parents=True, exist_ok=True)
     data_hash = hashlib.sha256(raw).hexdigest()[:16]
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    joblib.dump({"model": model, "tau": best_tau, "margin": best_margin, "features": FEATURES, "data_sha256": data_hash,
+    joblib.dump({"model": model, "tau": best_tau, "margin": best_margin, "features": FEATURES + (["visual_sim", "visual_gap"] if VIS is not None else []), "visual": VIS is not None, "data_sha256": data_hash,
                  "commit": commit}, a.model_out)
     report = {"data": a.data, "data_sha256_16": data_hash, "git_commit": commit,
               "pages": {"train": len(train), "val": len(val), "test_heldout_families": len(test)},
@@ -255,6 +272,9 @@ def main() -> int:
               "test_accuracy_gain_P0_vs_B4_95ci": [lo, hi], "conformal": conformal_results}
     for k, v in conformal_results.items():
         for where, r in v.items():
+            if "skipped" in r:
+                print(f"CONFORMAL {k} {where}: {r['skipped']}")
+                continue
             print(f"CONFORMAL {k} {where:<17} coverage {r['empirical_coverage']:.1%} (target {r['target_coverage']:.0%})"
                   f"  set size {r['mean_set_size']:.2f}  act-if-single: correct {r['act_if_single']['accuracy']:.1%}"
                   f" wrong {r['act_if_single']['wrong_click_rate']:.1%}")

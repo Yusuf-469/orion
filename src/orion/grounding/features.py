@@ -43,7 +43,8 @@ def load_model(path: Path | str = MODEL_PATH):
     return _bundle_cache[key]
 
 
-def locate_learned(description: str, cands: list[Candidate], bundle: dict, window) -> "Located":
+def locate_learned(description: str, cands: list[Candidate], bundle: dict, window,
+                   visual: list[float] | None = None) -> "Located":
     """Pick a candidate with the learned scorer; abstain below the trained threshold.
 
     `window` is the window's screen Box: boxes are made window-relative, as in training.
@@ -58,7 +59,12 @@ def locate_learned(description: str, cands: list[Candidate], bundle: dict, windo
                                  c.box.bottom - window.top), c.source, c.role, c.confidence, c.invokable, c.disabled)
            for c in cands]
     w, h = window.right - window.left, window.bottom - window.top
-    p = bundle["model"].predict_proba(np.array(featurize(description, rel, w, h)))[:, 1]
+    rows = featurize(description, rel, w, h)
+    if bundle.get("visual"):
+        if visual is None:
+            raise ValueError("this grounding model needs visual (SigLIP) features; none were provided")
+        rows = add_visual(rows, visual)
+    p = bundle["model"].predict_proba(np.array(rows))[:, 1]
     order = p.argsort()[::-1]
     i = int(order[0])
     if p[i] < bundle["tau"]:
@@ -70,6 +76,15 @@ def locate_learned(description: str, cands: list[Candidate], bundle: dict, windo
                                           f"({p[j]:.2f}) are both likely; not clicking", cands[j])
     return Located(cands[i], float(p[i]), f"found '{cands[i].text}' via {cands[i].source} "
                                           f"(learned score {p[i]:.2f})", cands[j] if j is not None else None)
+
+
+VISUAL_FEATURES = ["visual_sim", "visual_gap"]
+
+
+def add_visual(rows: list[list[float]], visual: list[float]) -> list[list[float]]:
+    """Append image-text similarity (SigLIP) features: the candidate's own and its gap to the best."""
+    best = max(visual, default=0.0)
+    return [r + [float(v), float(best - v)] for r, v in zip(rows, visual)]
 
 
 def featurize(description: str, cands: list[Candidate], width: int, height: int) -> list[list[float]]:
