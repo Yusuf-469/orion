@@ -26,6 +26,15 @@ MODEL_ID = "google/siglip-base-patch16-224"
 PAD = 8
 
 
+def crop(img, box):
+    """Crop with context, clamped to the image and never empty (some boxes lie partly off-screen)."""
+    left = min(max(0, box.left - PAD), img.width - 1)
+    top = min(max(0, box.top - PAD), img.height - 1)
+    right = max(left + 1, min(img.width, box.right + PAD))
+    bottom = max(top + 1, min(img.height, box.bottom + PAD))
+    return img.crop((left, top, right, bottom))
+
+
 def main() -> int:
     import torch
     from PIL import Image
@@ -48,14 +57,16 @@ def main() -> int:
             if not cands:
                 continue
             img = Image.open(data / "png" / s["png"]).convert("RGB")
-            crops = [img.crop((max(0, c.box.left - PAD), max(0, c.box.top - PAD),
-                               min(img.width, c.box.right + PAD), min(img.height, c.box.bottom + PAD))) for c in cands]
+            crops = [crop(img, c.box) for c in cands]
             texts = sorted({parse_instruction(v["text"])[0] or "unknown"
                             for b in s["instructions"] for v in variants(s, b)})
             ii = proc(images=crops, return_tensors="pt").to(dev)
             ti = proc(text=texts, padding="max_length", return_tensors="pt").to(dev)
             ie = model.get_image_features(**ii)
             te = model.get_text_features(**ti)
+            # transformers 5.x returns an output object; older versions return the tensor itself
+            ie = ie if isinstance(ie, torch.Tensor) else ie.pooler_output
+            te = te if isinstance(te, torch.Tensor) else te.pooler_output
             ie = torch.nn.functional.normalize(ie.float(), dim=-1)
             te = torch.nn.functional.normalize(te.float(), dim=-1)
             m = (te @ ie.T).cpu().numpy()          # texts x candidates
