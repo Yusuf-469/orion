@@ -99,7 +99,12 @@ class ScreenClickTool(Tool[ClickArgs, ClickOut]):
             time.sleep(0.3)
             hwnd = win.NativeWindowHandle
             cands = merge(_uia_candidates(auto, win), ocr_window(hwnd))
-            found = locate(args.target, cands)
+            from orion.grounding.features import load_model, locate_learned
+            from orion.grounding.screen import window_rect
+            bundle = load_model()
+            found = (locate_learned(args.target, cands, bundle, window_rect(hwnd)) if bundle
+                     else locate(args.target, cands))
+            scorer = "learned" if bundle else "rules"
             if found.candidate is None:
                 raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"did not click: {found.reason}")
             c = found.candidate
@@ -121,7 +126,8 @@ class ScreenClickTool(Tool[ClickArgs, ClickOut]):
                 how = f"mouse at ({x},{y})"
             time.sleep(0.5)   # let the app react before postconditions are checked
         return ClickOut(window=args.window, clicked=c.text, source=c.source, score=round(found.score, 3),
-                        evidence=f"clicked '{c.text}' found via {c.source} (score {found.score:.2f}) using {how}")
+                        evidence=f"clicked '{c.text}' found via {c.source} ({scorer} score {found.score:.2f}) "
+                                 f"using {how}")
 
 
 class OpenCanvasArgs(BaseModel):

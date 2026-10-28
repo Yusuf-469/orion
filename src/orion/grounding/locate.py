@@ -18,7 +18,8 @@ from orion.grounding.screen import Box, OcrWord
 THRESHOLD = 0.75
 MARGIN = 0.06
 _ROLE_WORDS = {"button": "ButtonControl", "link": "HyperlinkControl", "tab": "TabItemControl",
-               "checkbox": "CheckBoxControl", "menu": "MenuItemControl", "field": "EditControl"}
+               "checkbox": "CheckBoxControl", "menuitem": "MenuItemControl", "menu": "MenuItemControl",
+               "textbox": "EditControl", "field": "EditControl"}
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class Candidate:
     role: str = ""          # UIA control type, if known
     confidence: float = 1.0
     invokable: bool = False
+    disabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -39,16 +41,27 @@ class Located:
     runner_up: Candidate | None = None
 
 
-def parse_target(description: str) -> tuple[str, str | None]:
-    """'the Export button' -> ('export', 'ButtonControl'); quoted text wins."""
-    q = re.search(r"[\"'“”‘’]([^\"'“”‘’]+)[\"'“”‘’]", description)
-    words = description.strip().lower()
+def parse_instruction(description: str) -> tuple[str, str | None, str | None]:
+    """'the Save button in the toolbar' -> ('save', 'ButtonControl', 'toolbar'); quoted text wins."""
+    text = description.strip()
+    container = None
+    m = re.search(r"\s+in\s+the\s+(.+)$", text, re.I)
+    if m and not re.search(r"[\"'“”]", m.group(0)):
+        container, text = _norm(m.group(1)), text[:m.start()]
+    q = re.search(r"[\"'“”‘’]([^\"'“”‘’]+)[\"'“”‘’]", text)
+    words = text.lower()
     role = next((r for w, r in _ROLE_WORDS.items() if re.search(rf"\b{w}\b", words)), None)
     if q:
-        return _norm(q.group(1)), role
+        return _norm(q.group(1)), role, container
     words = re.sub(r"^(the|a|an)\s+", "", words)
-    words = re.sub(r"\s+(button|link|tab|checkbox|menu|field)$", "", words)
-    return _norm(words), role
+    words = re.sub(r"\s+(button|link|tab|checkbox|menu|menuitem|field|textbox)$", "", words)
+    return _norm(words), role, container
+
+
+def parse_target(description: str) -> tuple[str, str | None]:
+    """'the Export button' -> ('export', 'ButtonControl')."""
+    target, role, _ = parse_instruction(description)
+    return target, role
 
 
 def _norm(s: str) -> str:
@@ -72,7 +85,8 @@ def merge(uia: list[Candidate], ocr: list[OcrWord]) -> list[Candidate]:
                       and c.box.contains(*w.box.center) and text_similarity(_norm(c.text), w.text) > 0.8), None)
         if match is not None:
             c = out[match]
-            out[match] = Candidate(c.text, c.box, "uia+ocr", c.role, max(c.confidence, w.confidence), c.invokable)
+            out[match] = Candidate(c.text, c.box, "uia+ocr", c.role, max(c.confidence, w.confidence), c.invokable,
+                                   c.disabled)
         else:
             out.append(Candidate(w.text, w.box, "ocr", "", w.confidence, False))
     return out
