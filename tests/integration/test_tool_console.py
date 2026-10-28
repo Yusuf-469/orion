@@ -162,6 +162,40 @@ def test_kill_switch_closes_open_dialog_and_nothing_runs(qapp, make_window):
     assert _dialog(w) is None and target.exists()
 
 
+@pytest.mark.parametrize("button,expect", [(1, 1), ("neither", None), ("stop", None)])
+def test_which_one_did_you_mean_dialog(qapp, make_window, button, expect):
+    """The 'did you mean A or B?' dialog returns the picked option; Neither, Esc or STOP mean no click."""
+    import threading
+
+    from PySide6.QtWidgets import QMessageBox
+
+    from orion.policy import ConfirmationRequest
+    from orion.tools import SideEffect
+    w = make_window()
+    token = w.kill_switch.new_token()
+    req = ConfirmationRequest("screen.click", SideEffect.REVERSIBLE, "I see more than one 'Export'.", "only that one")
+    out: dict = {}
+    t = threading.Thread(target=lambda: out.setdefault("pick", w.confirmer.choose(
+        req, ["'Export' at the top middle", "'Export' at the centre"], token)))
+    t.start()
+    find = lambda: w.findChild(QMessageBox, "orion_choose")  # noqa: E731
+    assert _pump(qapp, 3, until=lambda: find() is not None and find().isVisible()), "no choice dialog"
+    box = find()
+    labels = [b.text() for b in box.buttons()]
+    assert "'Export' at the centre" in labels and "Neither, don't click" in labels
+    assert box.defaultButton().text() == "Neither, don't click"
+    if button == "stop":
+        token.cancel("test")
+    elif button == "neither":
+        box.defaultButton().click()
+    else:
+        next(b for b in box.buttons() if b.text() == "'Export' at the centre").click()
+    assert _pump(qapp, 3, until=lambda: not t.is_alive())
+    t.join(1)
+    assert out["pick"] == expect
+    w.kill_switch.reset()
+
+
 def test_invalid_json_args_rejected_without_task(qapp, make_window):
     w = make_window()
     w.tool_combo.setCurrentText("files.read")

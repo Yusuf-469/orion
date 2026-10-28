@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from orion.tools.base import Idempotency, Permission, SideEffect, Tool, ToolContext, ToolSpec
 from orion.tools.errors import ErrorCode, ToolError
@@ -63,10 +64,22 @@ def _root_window_at(x: int, y: int) -> int:
     return int(user32.GetAncestor(h, 2) or 0) if h else 0   # GA_ROOT
 
 
+def where(box, win) -> str:
+    """Plain-words position of a box inside the window, e.g. 'top left'."""
+    x, y = box.center
+    w, h = max(win.right - win.left, 1), max(win.bottom - win.top, 1)
+    col = ("left", "middle", "right")[min(2, 3 * (x - win.left) // w)]
+    row = ("top", "middle", "bottom")[min(2, 3 * (y - win.top) // h)]
+    return "centre" if (row, col) == ("middle", "middle") else f"{row} {col}"
+
+
 class ClickArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
     window: Literal["ORION Canvas Demo"]
     target: str = Field(min_length=1, max_length=100)
+    # Set only by recovery after the user picked one of several matches: a window-relative point inside
+    # the chosen element. Hidden from planners, and the plan validator rejects plans that set it.
+    user_choice: SkipJsonSchema[tuple[int, int] | None] = None
 
 
 class ClickOut(BaseModel):
@@ -101,17 +114,26 @@ class ScreenClickTool(Tool[ClickArgs, ClickOut]):
             cands = merge(_uia_candidates(auto, win), ocr_window(hwnd))
             from orion.grounding.features import load_model, locate_learned
             from orion.grounding.screen import window_rect
+            rect = window_rect(hwnd)
+            if args.user_choice is not None:
+                # The user picked one place: only elements there may be clicked, and they must still match.
+                px, py = rect.left + args.user_choice[0], rect.top + args.user_choice[1]
+                cands = [c for c in cands if c.box.contains(px, py)]
             bundle = load_model()
-            found = (locate_learned(args.target, cands, bundle, window_rect(hwnd)) if bundle
+            found = (locate_learned(args.target, cands, bundle, rect) if bundle
                      else locate(args.target, cands))
             scorer = "learned" if bundle else "rules"
             if found.candidate is None:
-                raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"did not click: {found.reason}")
+                choices = [{"text": c.text, "at": [c.box.center[0] - rect.left, c.box.center[1] - rect.top],
+                            "where": where(c.box, rect)} for c in found.choices]
+                raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"did not click: {found.reason}",
+                                **({"choices": choices} if choices and args.user_choice is None else {}))
             c = found.candidate
             if ctx.token.is_cancelled:
                 raise ToolError(ErrorCode.CANCELLED, "cancelled before clicking")
             if c.invokable and c.source != "ocr":
-                ctrl = next(x for x, _ in auto.WalkControl(win, maxDepth=12) if x.Name == c.text)
+                ctrl = next(x for x, _ in auto.WalkControl(win, maxDepth=12) if x.Name == c.text
+                            and c.box.contains(x.BoundingRectangle.xcenter(), x.BoundingRectangle.ycenter()))
                 ctrl.GetInvokePattern().Invoke()
                 how = "UIA Invoke"
             else:
@@ -125,9 +147,10 @@ class ScreenClickTool(Tool[ClickArgs, ClickOut]):
                 ctypes.windll.user32.SetCursorPos(old.x, old.y)
                 how = f"mouse at ({x},{y})"
             time.sleep(0.5)   # let the app react before postconditions are checked
+        chosen = "the one you chose: " if args.user_choice is not None else ""
         return ClickOut(window=args.window, clicked=c.text, source=c.source, score=round(found.score, 3),
-                        evidence=f"clicked '{c.text}' found via {c.source} ({scorer} score {found.score:.2f}) "
-                                 f"using {how}")
+                        evidence=f"clicked {chosen}'{c.text}' found via {c.source} "
+                                 f"({scorer} score {found.score:.2f}) using {how}")
 
 
 class OpenCanvasArgs(BaseModel):

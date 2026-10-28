@@ -74,13 +74,14 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | **P0 learned grounding scorer, live in the product** | verified (held-out families + real app) | correct 63.1% -> 90.3%, wrong clicks 1.0% -> 0.8% vs rules; CI +25.8..+28.7 pts; real canvas clicks on both monitors. `research/reports/grounding_v1.md` |
 | Conformal abstention | measured | coverage 90.7%/95.9% in-distribution, 89.4%/96.4% held-out; not used as click rule (more wrong clicks) |
 | Frozen SigLIP features / P1 LoRA fine-tune | measured, not shipped | +2 pts correct, no fewer wrong clicks; P1 no gain over frozen (negative result) |
+| **"Did you mean A or B?"** (screen.click asks when several places match, clicks only the one picked) | verified (real) | 2026-10-28: canvas demo with two "Export" buttons, pick centre -> "Export #2", pick top -> "Export #1", exactly one click each; no answer -> step blocked, nothing clicked (`tests/end_to_end/test_visual_click.py`, 6 passed x2); dialog offscreen (Neither/STOP = no click); plans cannot set the pick (`user_only_argument`). Choices come from duplicate-label / margin ties, not conformal sets |
 | GPU stack | installed (approved) | torch 2.11.0+cu128 on RTX 4060, transformers 5.21, peft 0.21, scikit-learn 1.9.1, SigLIP base (Apache-2.0) |
 
 ## Test totals (2026-10-24, end of session)
 `-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
 ## RESUME HERE (Stage 6 core done)
-2026-10-28: learned grounding scorer live (90% correct on unseen layouts, fewer wrong clicks than rules); conformal analysis, frozen and fine-tuned SigLIP measured (not shipped). Next options: real-app grounding test set (Paint/Settings screenshots), "did you mean A or B?" using conformal sets, benchmark (Stage 9). Open: human-eye checks M7/M9.
+2026-10-28: learned grounding scorer live (90% correct on unseen layouts, fewer wrong clicks than rules); conformal analysis, frozen and fine-tuned SigLIP measured (not shipped); "did you mean A or B?" live. Latest totals: `-m "not real"` 239 passed, `-m real` 20 passed + 1 skipped (hotkey held by a running ORION). Next options: real-app grounding test set (Paint/Settings screenshots), benchmark (Stage 9). Open: human-eye checks M7/M9.
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.

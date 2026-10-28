@@ -28,6 +28,7 @@ def test_abstains_when_two_places_match():
     cands = merge([], [ocr("Export", 0, 0), ocr("Export", 300, 200)])
     r = locate("Export", cands)
     assert r.candidate is None and "ambiguous" in r.reason
+    assert {c.box.left for c in r.choices} == {0, 300}   # both places are offered to the user
 
 
 def test_uia_and_ocr_agreement_merges_into_one_candidate():

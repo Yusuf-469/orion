@@ -65,8 +65,17 @@ class Confirmer(Protocol):
         ...
 
 
+class Chooser(Protocol):
+    def choose(self, request: ConfirmationRequest, options: list[str], token: CancelToken) -> int | None:
+        """Ask the user to pick one option. Return its index, or None for "none of these" / cancelled."""
+        ...
+
+
 class DenyAllConfirmer:
-    """Default when no UI is attached: every confirmation is declined."""
+    """Default when no UI is attached: every confirmation is declined, no choice is made."""
 
     def confirm(self, request: ConfirmationRequest, token: CancelToken) -> bool:
         return False
+
+    def choose(self, request: ConfirmationRequest, options: list[str], token: CancelToken) -> int | None:
+        return None

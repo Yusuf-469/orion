@@ -74,12 +74,23 @@ def locate_learned(description: str, cands: list[Candidate], bundle: dict, windo
     order = p.argsort()[::-1]
     i = int(order[0])
     if p[i] < bundle["tau"]:
+        # The scorer abstains on duplicate labels by design; if several separate places show the label,
+        # report them so the user can be asked which one was meant.
+        same: list[Candidate] = []
+        for k in order:
+            c = cands[int(k)]
+            if rows[int(k)][0] >= 0.9 and all(c.box.iou(o.box) < 0.3 for o in same):
+                same.append(c)
+        if len(same) >= 2:
+            return Located(None, float(p[i]), f"{len(same)} elements look like '{same[0].text}'; "
+                                              f"not clicking without knowing which", None, tuple(same[:4]))
         return Located(None, float(p[i]), f"not confident enough (best '{cands[i].text}' {p[i]:.2f} "
                                           f"< {bundle['tau']:.2f}); not clicking")
     j = next((int(o) for o in order[1:] if cands[int(o)].box.iou(cands[i].box) < 0.3), None)
     if j is not None and p[i] - p[j] < bundle.get("margin", 0.0):
         return Located(None, float(p[i]), f"ambiguous: '{cands[i].text}' ({p[i]:.2f}) and '{cands[j].text}' "
-                                          f"({p[j]:.2f}) are both likely; not clicking", cands[j])
+                                          f"({p[j]:.2f}) are both likely; not clicking", cands[j],
+                       (cands[i], cands[j]))
     return Located(cands[i], float(p[i]), f"found '{cands[i].text}' via {cands[i].source} "
                                           f"(learned score {p[i]:.2f})", cands[j] if j is not None else None)
 

@@ -221,7 +221,7 @@ class GraphRunner:
             self._emit(task_id, "INFO" if fixed else "WARNING", "recovery",
                        f"{step.id}: recovery {'worked' if fixed else 'not applied'}: {how}")
             if fixed and not token.is_cancelled:
-                r = self.runtime.execute(ToolCall(tool_id=step.tool_id, args=args), token)
+                r = self.runtime.execute(ToolCall(tool_id=step.tool_id, args=rec.retry_args or args), token)
                 recovered = f"recovered ({how}); "
             elif not fixed:
                 self.store.set_step_status(sid, Status.BLOCKED, f"{r.evidence}; {how}")

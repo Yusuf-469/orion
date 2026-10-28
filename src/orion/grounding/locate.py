@@ -39,6 +39,7 @@ class Located:
     score: float
     reason: str
     runner_up: Candidate | None = None
+    choices: tuple[Candidate, ...] = ()     # when ambiguous: the places the user could have meant
 
 
 def parse_instruction(description: str) -> tuple[str, str | None, str | None]:
@@ -116,5 +117,5 @@ def locate(description: str, candidates: list[Candidate]) -> Located:
     rival = next(((s, c) for s, c in ranked[1:] if c.box.iou(c1.box) < 0.3), None)
     if rival and rival[0] >= THRESHOLD and s1 - rival[0] < MARGIN:
         return Located(None, s1, f"ambiguous: '{c1.text}' and '{rival[1].text}' both match '{target}'",
-                       runner_up=rival[1])
+                       runner_up=rival[1], choices=(c1, rival[1]))
     return Located(c1, s1, f"found '{c1.text}' via {c1.source} (score {s1:.2f})", rival[1] if rival else None)

@@ -24,6 +24,7 @@ from orion.tools.registry import ToolRegistry
 
 # Arguments that name something a non-read-only tool changes.
 WRITE_ARGS = ("path", "dst")
+USER_ONLY_ARGS = frozenset({"user_choice"})   # filled in by recovery from the user's answer, never by a planner
 _DUMMY = {str: "x", int: 0, float: 0.0, bool: False}
 
 
@@ -258,6 +259,9 @@ def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by
                     continue
                 if not _authorized(v, goal.authorized_outputs):
                     err("unauthorized_output", f"{k}={v!r} is not in the goal's authorized outputs", s.id)
+
+    for k in USER_ONLY_ARGS & set(s.args):
+        err("user_only_argument", f"argument {k!r} can only come from the user's own answer, not a plan", s.id)
 
     c = goal.constraints
     if s.tool_id == "files.delete" and (c.preserve_source_files or not c.allow_delete):

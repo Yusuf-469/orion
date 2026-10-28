@@ -47,4 +47,24 @@ def test_unreadable_model_file_falls_back_to_rules(tmp_path):
 
 def test_abstains_below_threshold():
     r = locate_learned("Delete", cands(), {"model": SimModel(), "tau": 0.9}, Box(0, 0, 800, 600))
-    assert r.candidate is None and "not confident enough" in r.reason
+    assert r.candidate is None and "not confident enough" in r.reason and r.choices == ()
+
+
+class DuplicateShy(SimModel):
+    """Like a trained scorer: low probability when the label appears more than once."""
+    def predict_proba(self, X):
+        p = np.where(X[:, 0] > 0.9, 0.2, 0.0)
+        return np.stack([1 - p, p], axis=1)
+
+
+def test_duplicate_labels_abstain_but_offer_each_place():
+    two = cands() + [Candidate("Export", Box(100, 200, 170, 220), "ocr", "", 0.99)]
+    r = locate_learned("Export", two, {"model": DuplicateShy(), "tau": 0.5}, Box(0, 0, 800, 600))
+    assert r.candidate is None and "2 elements look like 'Export'" in r.reason
+    assert sorted(c.box.top for c in r.choices) == [10, 200]
+
+
+def test_one_label_seen_twice_in_the_same_place_is_not_a_choice():
+    same = cands() + [Candidate("Export", Box(101, 11, 171, 31), "ocr", "", 0.9)]   # overlapping duplicate
+    r = locate_learned("Export", same, {"model": DuplicateShy(), "tau": 0.5}, Box(0, 0, 800, 600))
+    assert r.candidate is None and r.choices == ()

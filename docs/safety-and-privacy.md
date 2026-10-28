@@ -31,6 +31,7 @@
 - **Screenshots:** only of the one window ORION is working in (never the whole screen), kept in memory for OCR and never written to disk. OCR runs locally (RapidOCR, Apache-2.0, CPU).
 - **screen.click** works only in allowlisted windows (currently only ORION's own canvas demo app). Adding an app needs a safety review.
 - It abstains when no visible label matches well or when two places match almost equally; it never clicks the window frame's own Minimize/Maximize/Close; before a mouse click it checks that its window is really the one under that point, and it puts the cursor back afterwards.
+- **"Which one did you mean?"** When several places match, ORION shows them (label and rough position) and clicks only the one you pick, and only if it still matches there. "Neither", Esc or STOP means nothing is clicked. The pick covers that one click; a plan can never set it (the validator rejects it).
 - **Calculator** is controlled through UI Automation in ORION's own new window, which ORION closes afterwards.
 - **Notepad:** ORION only reads or writes the tab it opened itself, matched by exact name; it refuses when several tabs share that name, never opens duplicate copies, and backs up a file before replacing its text.
 

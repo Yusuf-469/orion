@@ -3,6 +3,8 @@
 Only failures where nothing was changed are recoverable here:
   - a dialog blocks ORION's Notepad window   -> ask the user, then close it like Cancel / X
   - ORION's Notepad tab is no longer active  -> bring it back with notepad.open_file
+  - screen.click found several equally likely matches -> ask "did you mean A or B?", then retry the
+    click restricted to the place the user picked (Recovery.retry_args)
 Uncertain outcomes are never retried; everything else fails or blocks as before.
 """
 
@@ -18,11 +20,12 @@ from orion.tools.base import SideEffect
 from orion.tools.errors import ErrorCode
 
 
-@dataclass(frozen=True)
+@dataclass
 class Recovery:
-    kind: Literal["dismiss_dialog", "reacquire_tab"]
+    kind: Literal["dismiss_dialog", "reacquire_tab", "ask_choice"]
     description: str
     data: dict[str, Any] = field(default_factory=dict)
+    retry_args: dict[str, Any] | None = None    # set by apply() when the retry must use different args
 
 
 class RecoveryEngine:
@@ -41,6 +44,10 @@ class RecoveryEngine:
                 and tool_id.startswith("notepad.") and isinstance(args.get("path"), str)):
             return Recovery("reacquire_tab", f"bring {d['tab_not_active']} back to the front in Notepad",
                             {"path": args["path"]})
+        if (result.error_code is ErrorCode.TARGET_NOT_FOUND and tool_id == "screen.click"
+                and len(d.get("choices") or []) >= 2 and args.get("user_choice") is None):
+            return Recovery("ask_choice", f"ask you which '{args.get('target')}' you meant",
+                            {"choices": d["choices"], "args": dict(args)})
         return None
 
     def apply(self, rec: Recovery, token: CancelToken) -> tuple[bool, str]:
@@ -68,4 +75,20 @@ class RecoveryEngine:
         if rec.kind == "reacquire_tab":
             r = self.runtime.execute(ToolCall(tool_id="notepad.open_file", args={"path": rec.data["path"]}), token)
             return r.ok, r.evidence
+        if rec.kind == "ask_choice":
+            choose = getattr(self.confirmer, "choose", None)
+            if choose is None:
+                return False, "several matches and no way to ask you; not clicking"
+            ch = rec.data["choices"]
+            target = rec.data["args"].get("target")
+            req = ConfirmationRequest(
+                tool_id="screen.click", side_effect=SideEffect.REVERSIBLE,
+                action=f"I see more than one '{target}'. Which one did you mean?",
+                consequence="ORION clicks only the one you pick, and only if it still matches.")
+            pick = choose(req, [f"'{c['text']}' at the {c['where']}" for c in ch], token)
+            if pick is None or token.is_cancelled:
+                return False, "you did not pick one; not clicking"
+            c = ch[pick]
+            rec.retry_args = {**rec.data["args"], "user_choice": list(c["at"])}
+            return True, f"you picked '{c['text']}' at the {c['where']}"
         return False, f"unknown recovery {rec.kind}"
