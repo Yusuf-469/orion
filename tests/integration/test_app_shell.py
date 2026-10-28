@@ -159,6 +159,9 @@ def test_real_hotkey_registration_and_wm_hotkey_handling(qapp, tmp_path):
     w.show()
     _pump(qapp, 0.2)
     try:
+        if not w._hotkey_registered and "1409" in w.statusBar().currentMessage():
+            # Win32 1409 = hotkey already registered, e.g. by an ORION window that is already running.
+            pytest.skip("Ctrl+Alt+End is held by another running program (likely an open ORION window)")
         assert w._hotkey_registered, w.statusBar().currentMessage()
         ctypes.windll.user32.PostMessageW(int(w.winId()), hotkey.WM_HOTKEY, hotkey.HOTKEY_ID, 0)
         assert _pump(qapp, 1.0, until=lambda: w.kill_switch.engaged)

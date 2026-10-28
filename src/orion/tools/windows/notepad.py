@@ -304,12 +304,23 @@ class CloseTabTool(Tool[PathArgs, Out]):
                 raise ToolError(ErrorCode.STALE_STATE,
                                 f"{len(tabs)} Notepad tabs are named {p.name}; ORION will not guess which is its own")
             closed = 0
-            for _w, tab in tabs:
-                btn = tab.ButtonControl(AutomationId="CloseButton")
-                if btn.Exists(1):
-                    btn.GetInvokePattern().Invoke()
-                    closed += 1
-            time.sleep(0.5)
+            for attempt in range(2):
+                for _w, tab in find_tabs(auto, p.name):
+                    try:
+                        btn = tab.ButtonControl(AutomationId="CloseButton")
+                        if not btn.Exists(0.5):
+                            # The close button only shows on the selected tab.
+                            tab.GetSelectionItemPattern().Select()
+                            time.sleep(0.3)
+                        btn.GetInvokePattern().Invoke()
+                        closed += 1
+                    except Exception:   # transient UIA/COM error while tabs are changing: retry once
+                        time.sleep(0.5)
+                end = time.monotonic() + 6   # closing can take a few seconds
+                while time.monotonic() < end and find_tabs(auto, p.name):
+                    time.sleep(0.3)
+                if not find_tabs(auto, p.name):
+                    break
             still = find_tabs(auto, p.name)
         if still:
             raise ToolError(ErrorCode.VERIFICATION_FAILED, f"a tab for {p.name} is still open")
