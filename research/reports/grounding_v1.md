@@ -33,7 +33,7 @@ The rule fixed before training says: P1 ships only if it beats **P0** on **valid
 | Held-out: P1 - P0 | +2.2 pts (+1.3 to +3.3) | +0.1 pts (-0.2 to +0.5) |
 | Held-out: P1 - P0+frozen SigLIP | +0.1 pts (-0.7 to +0.9) | +0.2 pts (-0.1 to +0.6) |
 
-**P1 passes the pre-registered rule.** The earlier "negative result" is withdrawn. What remains true: the gain from *fine-tuning* over frozen SigLIP features appears on validation (same layout families) but not on held-out families, so the generalizing part of P1's gain comes from adding SigLIP at all. Whether the product switches to P1 (which needs SigLIP and PyTorch at click time) is an open decision recorded in STATUS.md.
+**P1 passes the pre-registered rule.** The earlier "negative result" is withdrawn. What remains true: the gain from *fine-tuning* over frozen SigLIP features appears on validation (same layout families) but not on held-out families, so the generalizing part of P1's gain comes from adding SigLIP at all. **Product decision (author, 2026-10-29): keep P0; P1 is not deployed**, a documented deviation from the plan's "P1 becomes ORION's grounding method". Reasons: SigLIP and PyTorch at click time (cost not measured; estimated about 1 GB and slower clicks), clicking by sight is allowlisted to one demo app, no end-to-end difference in the benchmark, and rules did better on real apps.
 
 ## Conformal abstention (split by page)
 

@@ -110,7 +110,7 @@ P0 vs rule fusion: paired bootstrap 95% CI on the accuracy difference **+25.8 to
 | Held-out: P1 - P0 | +2.2 (+1.3 to +3.3) | +0.1 (-0.2 to +0.5) |
 | Held-out: P1 - P0 + frozen SigLIP | +0.1 (-0.7 to +0.9) | +0.2 (-0.1 to +0.6) |
 
-P1 passes the rule. The benefit of *fine-tuning* over frozen features appears only on the training families' validation split, not on unseen families. **Process note:** the first write-up compared P1 with frozen SigLIP on the test set and wrongly called it a negative result; the rule was then applied as written to the same trained models and the conclusion corrected (grounding_v1.md, "Correction"). [Decision on shipping P1 in the product: to fill in.]
+P1 passes the rule. The benefit of *fine-tuning* over frozen features appears only on the training families' validation split, not on unseen families. **Process note:** the first write-up compared P1 with frozen SigLIP on the test set and wrongly called it a negative result; the rule was then applied as written to the same trained models and the conclusion corrected (grounding_v1.md, "Correction"). **Product decision (author, 2026-10-29): P0 stays in the product; P1 is not deployed.** This is a documented deviation from the plan, which says a P1 that passes the rule becomes ORION's grounding method. Reasons: P1 needs SigLIP and PyTorch loaded at click time (not measured; estimated at about 1 GB more and slower clicks), visual clicking is currently allowlisted to one demo app, the end-to-end benchmark showed no difference between learned and rule grounding, and on real applications the rules did better.
 
 ### 4.5 Conformal abstention
 
