@@ -102,7 +102,7 @@ class ScreenClickTool(Tool[ClickArgs, ClickOut]):
     def run(self, args: ClickArgs, ctx: ToolContext) -> ClickOut:
         if sys.platform != "win32":
             raise ToolError(ErrorCode.UNSUPPORTED_CAPABILITY, "screen.click is Windows-only")
-        from orion.grounding.locate import locate, merge
+        from orion.grounding.locate import collapse_nested, locate, merge
         from orion.grounding.screen import ensure_dpi_aware, ocr_window
         from orion.tools.windows.notepad import _uia
         ensure_dpi_aware()
@@ -111,7 +111,7 @@ class ScreenClickTool(Tool[ClickArgs, ClickOut]):
             win.SetActive()
             time.sleep(0.3)
             hwnd = win.NativeWindowHandle
-            cands = merge(_uia_candidates(auto, win), ocr_window(hwnd))
+            cands = collapse_nested(merge(_uia_candidates(auto, win), ocr_window(hwnd)))
             from orion.grounding.features import load_model, locate_learned
             from orion.grounding.screen import window_rect
             rect = window_rect(hwnd)

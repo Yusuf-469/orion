@@ -75,6 +75,7 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Conformal abstention | measured | coverage 90.7%/95.9% in-distribution, 89.4%/96.4% held-out; not used as click rule (more wrong clicks) |
 | Frozen SigLIP features / P1 LoRA fine-tune | measured, not shipped | +2 pts correct, no fewer wrong clicks; P1 no gain over frozen (negative result) |
 | **"Did you mean A or B?"** (screen.click asks when several places match, clicks only the one picked) | verified (real) | 2026-10-28: canvas demo with two "Export" buttons, pick centre -> "Export #2", pick top -> "Export #1", exactly one click each; no answer -> step blocked, nothing clicked (`tests/end_to_end/test_visual_click.py`, 6 passed x2); dialog offscreen (Neither/STOP = no click); plans cannot set the pick (`user_only_argument`). Choices come from duplicate-label / margin ties, not conformal sets |
+| Grounding on real apps (Calculator, Paint, Character Map; ORION's own windows, nothing clicked) | measured | `research/reports/grounding_real_v1.md`: 0 wrong clicks with metadata; found + fixed nested-element bug (`collapse_nested`, learned 68% -> 79% correct); rules 87.5% beat learned on real apps (synthetic-to-real gap); OCR alone finds ~10% (icons) |
 | GPU stack | installed (approved) | torch 2.11.0+cu128 on RTX 4060, transformers 5.21, peft 0.21, scikit-learn 1.9.1, SigLIP base (Apache-2.0) |
 
 ## Test totals (2026-10-24, end of session)

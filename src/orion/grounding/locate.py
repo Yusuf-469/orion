@@ -93,6 +93,42 @@ def merge(uia: list[Candidate], ocr: list[OcrWord]) -> list[Candidate]:
     return out
 
 
+CLICKABLE_ROLES = ("ButtonControl", "SplitButtonControl", "MenuItemControl", "TabItemControl", "ListItemControl",
+                   "CheckBoxControl", "RadioButtonControl", "HyperlinkControl")
+
+
+def collapse_nested(cands: list[Candidate]) -> list[Candidate]:
+    """One visible control = one candidate.
+
+    Real apps expose a single control as several nested UIA elements with the same name (a menu item
+    and a button with the same box, or a button and its text label). Left as they are, they look like
+    duplicate labels and make grounding abstain. Same-name candidates whose boxes nest are merged into
+    the most clickable one (largest on ties), noting whether OCR also saw it.
+    """
+    def rank(c: Candidate) -> tuple:
+        return (c.role in CLICKABLE_ROLES, c.box.area)
+
+    groups: list[list[Candidate]] = []
+    for c in cands:
+        n = _norm(c.text)
+        g = next((g for g in groups if _norm(g[0].text) == n and any(
+            o.box.contains(*c.box.center) or c.box.contains(*o.box.center) for o in g)), None)
+        if g is None:
+            groups.append([c])
+        else:
+            g.append(c)
+    out = []
+    for g in groups:
+        if len(g) == 1:
+            out.append(g[0])
+            continue
+        best = max(g, key=rank)
+        sources = {s for c in g for s in c.source.split("+")}
+        out.append(Candidate(best.text, best.box, "+".join(s for s in ("uia", "ocr") if s in sources), best.role,
+                             max(c.confidence for c in g), any(c.invokable for c in g), best.disabled))
+    return out
+
+
 def score(c: Candidate, target: str, role: str | None) -> float:
     s = text_similarity(target, c.text)
     if c.source == "ocr":
