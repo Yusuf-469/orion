@@ -57,15 +57,20 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | History inspect/delete (spec 10) | implemented-mock (offscreen) | `tests/integration/test_goal_ui.py` |
 | Goal box, resume banner in UI | implemented-mock (offscreen) + app launch verified | `test_goal_ui.py`; app launched as "ORION (Stage 3)", exit 0 |
 | Stage 3 manual checklist G1 to G10 | planned | `docs/stage3_manual_checklist.md` |
-| UIA / browser perception and verification (Stage 4) | planned | |
+| Notepad control via UI Automation (open file, read, set text + save with backup, close own tab) | verified (real) | `tests/integration/test_notepad_real.py`. Privacy guard: only the active tab ORION opened is ever read/written (Win 11 Notepad restores the user's tabs) |
+| Browser: read table / text from local pages (headless Chromium, throwaway profile) | verified (real) | `tests/integration/test_browser_docs.py`; non-local URLs and paths outside the workspace refused |
+| CSV write + summarize (new files only, read-back verified) | verified | same file |
+| **First end-to-end demo** (web table → report.csv → summary.txt → Notepad, screen checked against disk) | verified (real) | `tests/end_to_end/test_demo_slice.py`; **10/10 consecutive real runs** 2026-10-28, commit 155fdfa |
+| Prompt injection on the demo page cannot change the plan | verified | plan fixed before the page is read; page text returned as untrusted data only |
+| Unexpected-dialog recovery (second half of the slice) | planned | Stage 5 |
 | Recovery (Stage 5) | planned | |
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24, end of session)
 `-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stages 1 to 3 closed)
-2026-10-27: all Stage 1-3 checklists verified by a scripted real-window acceptance run (24/24, twice); real-LLM planner measured (C4 baseline). Waiting for approval to start Stage 4 (Windows UIA + browser control). Only human-eye checks remain open (M7 during a task, M9 DPI look).
+## RESUME HERE (Stage 4 core done)
+2026-10-28: ORION controls Notepad and reads local web pages; the first end-to-end demo works for real (10/10). Next: form filling that stops before submit, then Stage 5 (unexpected dialogs, recovery). Human-eye checks still open (M7 during a task, M9 DPI look).
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.

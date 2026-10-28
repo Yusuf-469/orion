@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         self.graph = GraphRunner(store, self.kill_switch, self.tool_runtime, Verifier(cfg.workspace_dir),
                                  on_event=self._bridge.event.emit)
 
-        self.setWindowTitle("ORION (Stage 3)")
+        self.setWindowTitle("ORION")
         self.resize(1100, 760)
         self._build_ui()
         self._refresh_tasks()
@@ -150,14 +150,15 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         granted = ", ".join(self.cfg.granted_permissions)
         banner = QLabel(
-            f"Stage 3: goals are planned by the deterministic template planner (no AI model yet), validated, "
-            f"then run. Files are confined to: {self.cfg.workspace_dir.resolve()}  |  Granted: {granted}")
+            f"ORION works only inside {self.cfg.workspace_dir.resolve()} and on local pages in its pages\\ folder. "
+            f"Hover over the Goal box to see what it understands.  |  Allowed: {granted}")
         banner.setWordWrap(True)
         banner.setStyleSheet("background:#fff3cd;color:#664d03;padding:6px;border-radius:4px;")
 
         self.goal_input = QLineEdit()
         self.goal_input.setPlaceholderText(
-            'Goal, e.g.: create a file notes.txt containing hello then copy notes.txt to backup/notes.txt')
+            "Try: save the table from sales.html as report.csv then summarize report.csv into summary.txt "
+            "then open summary.txt in notepad")
         self.goal_input.setToolTip("Supported phrases:\n" + "\n".join(SUPPORTED_PHRASES) +
                                    "\nChain clauses with 'then'.")
         self.goal_input.returnPressed.connect(self.start_goal)
