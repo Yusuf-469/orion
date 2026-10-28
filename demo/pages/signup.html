@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Event Sign-up (ORION demo page)</title>
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; margin: 32px; color: #1b1b1b; max-width: 520px; }
+  label { display: block; margin-top: 14px; font-weight: 600; }
+  input, textarea { width: 100%; padding: 6px; margin-top: 4px; box-sizing: border-box; }
+  button { margin-top: 18px; padding: 8px 18px; }
+  #status { margin-top: 18px; color: #2e7d32; }
+</style>
+</head>
+<body>
+  <h1>Event Sign-up</h1>
+  <p>Local demo page for ORION. Nothing is sent anywhere.</p>
+  <form id="signup">
+    <label for="name">Name</label>
+    <input id="name" name="name" required>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required>
+    <label for="phone">Phone</label>
+    <input id="phone" name="phone">
+    <label for="message">Message</label>
+    <textarea id="message" name="message" rows="3"></textarea>
+    <button type="submit">Submit</button>
+  </form>
+  <div id="status"></div>
+  <script>
+    document.getElementById("signup").addEventListener("submit", function (e) {
+      e.preventDefault();
+      document.body.dataset.submitted = "yes";
+      document.getElementById("status").textContent = "Submitted (demo only, nothing was sent).";
+    });
+  </script>
+</body>
+</html>

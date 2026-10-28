@@ -37,7 +37,10 @@ SUPPORTED_PHRASES = [
     'open FILE in notepad',
     'type "TEXT" into FILE in notepad',
     'close FILE in notepad',
+    'fill the form on PAGE.html with name "..." email "..." (stops before submit)',
 ]
+
+_FIELD = re.compile(r'([A-Za-z][\w ]*?)\s*[:=]?\s*"([^"]*)"')
 
 
 def split_clauses(text: str) -> list[str]:
@@ -94,6 +97,8 @@ class TemplatePlanner:
             (re.compile(rf"^(?:type|write|put)\s+(?:\"([^\"]*)\"|'([^']*)'|(.+?))\s+into\s+{_P}\s+(?:in|using|with)\s+"
                         rf"notepad$", re.I | re.S), self._np_type),
             (re.compile(rf"^close\s+{_P}\s+in\s+notepad$", re.I), self._np_close),
+            (re.compile(rf"^fill\s+(?:in\s+)?the\s+form\s+(?:on|in)\s+{_P}\s+with\s+(.+)$", re.I | re.S),
+             self._fill_form),
             (re.compile(rf"^(?:create|make|write)\s+(?:a\s+)?(?:new\s+)?(?:text\s+)?(?:file|note)"
                         rf"(?:\s+(?:named|called))?\s+{_P}\s+(?:containing|with(?:\s+the)?\s+text|saying|with)"
                         rf"\s+(.+)$", re.I | re.S), self._create),
@@ -153,6 +158,16 @@ class TemplatePlanner:
         path = _resolve(_path(m, 0), d)
         d.add("notepad.close_tab", {"path": path}, f"close {path} in Notepad", writes=[path])
         d.open_in_notepad.discard(path.lower())
+
+    def _fill_form(self, m, d):
+        page = _path(m, 0)
+        pairs = _FIELD.findall(m.group(4))
+        if not pairs:
+            d.missing.append('Which fields and values? e.g. name "Asha" email "asha@example.com"')
+            return
+        fields = {name.strip().removeprefix("and ").strip(): value for name, value in pairs}
+        d.add("browser.fill_form", {"page": page, "fields": fields},
+              f"fill {len(fields)} field(s) on {page} and stop before submitting")
 
     def _create(self, m, d):
         path, text = _path(m, 0), m.group(4).strip().strip('"\'')

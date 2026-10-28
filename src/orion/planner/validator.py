@@ -185,6 +185,10 @@ def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> 
     # Text a plan writes must come from the user's own words (seen with Phi-3.5: invented content).
     req = _squash(goal.request)
     for s in plan.steps:
+        if s.tool_id == "browser.fill_form" and isinstance(s.args.get("fields"), dict):
+            for name, val in s.args["fields"].items():
+                if isinstance(val, str) and _squash(val) not in req:
+                    err("intent_drift", f"form value for {name!r} does not come from the request", s.id)
         v = s.args.get("content", s.args.get("text"))
         if s.tool_id in ("files.write_new", "notepad.set_text") and isinstance(v, str) and parse_ref(v) is None:
             if not v.strip() and "empty" not in req:

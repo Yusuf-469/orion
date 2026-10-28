@@ -133,5 +133,106 @@ class ReadTextTool(Tool[TextArgs, TextOut]):
                        evidence=f"read {min(len(text), MAX_TEXT)} characters from '{title}' (untrusted page text)")
 
 
+class FillArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    page: str = Field(min_length=1, max_length=500)
+    fields: dict[str, str] = Field(min_length=1, max_length=30)   # field label (or name) -> value
+
+
+class FillOut(BaseModel):
+    page: str
+    filled: dict[str, str]
+    pid: int
+    port: int
+    evidence: str
+
+
+def _free_port() -> int:
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class FillFormTool(Tool[FillArgs, FillOut]):
+    """Fill a form in a VISIBLE browser window and leave it open for the user to review and submit.
+
+    There is deliberately no submit capability. The window uses a fresh temporary profile.
+    """
+    spec = ToolSpec(
+        id="browser.fill_form", version="1.0",
+        description="Fill a form on a local page in a visible browser and STOP before submitting.",
+        input_model=FillArgs, output_model=FillOut, permissions=frozenset({Permission.BROWSER_READ}),
+        side_effect=SideEffect.REVERSIBLE, timeout_s=45, idempotency=Idempotency.NON_IDEMPOTENT,
+        verification="every field reads back its value and the form was not submitted",
+    )
+
+    def run(self, args: FillArgs, ctx: ToolContext) -> FillOut:
+        import subprocess
+        import tempfile
+        import time
+
+        from playwright.sync_api import Error as PwError
+        from playwright.sync_api import sync_playwright
+
+        url = resolve_page(args.page, ctx)
+        if ctx.token.is_cancelled:
+            raise ToolError(ErrorCode.CANCELLED, "cancelled before opening the browser")
+        port = _free_port()
+        with sync_playwright() as pw:
+            exe = pw.chromium.executable_path
+        profile = tempfile.mkdtemp(prefix="orion_browser_")
+        # Launched as our own process so the window stays open after ORION disconnects.
+        proc = subprocess.Popen([exe, f"--remote-debugging-port={port}", "--remote-debugging-address=127.0.0.1",
+                                 f"--user-data-dir={profile}", "--no-first-run", "--no-default-browser-check",
+                                 "--new-window", url])
+        try:
+            with sync_playwright() as pw:
+                browser = None
+                for _ in range(40):
+                    try:
+                        browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+                        break
+                    except PwError:
+                        time.sleep(0.25)
+                if browser is None:
+                    raise ToolError(ErrorCode.APPLICATION_UNAVAILABLE, "could not connect to the browser window")
+                page = next((p for c in browser.contexts for p in c.pages if p.url.startswith(url[:40])), None)
+                for _ in range(20):
+                    if page is not None:
+                        break
+                    time.sleep(0.25)
+                    page = next((p for c in browser.contexts for p in c.pages if p.url.startswith(url[:40])), None)
+                if page is None:
+                    raise ToolError(ErrorCode.TARGET_NOT_FOUND, "the page did not open")
+                page.wait_for_load_state("load")
+                filled = {}
+                for key, value in args.fields.items():
+                    if ctx.token.is_cancelled:
+                        raise ToolError(ErrorCode.CANCELLED, f"cancelled after filling {len(filled)} field(s)")
+                    box = page.get_by_label(key, exact=False)
+                    if box.count() != 1:
+                        box = page.locator(f"[name='{key}']")
+                    if box.count() != 1:
+                        raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no single form field labelled {key!r}")
+                    box.fill(value)
+                    got = box.input_value()
+                    if got != value:
+                        raise ToolError(ErrorCode.VERIFICATION_FAILED, f"field {key!r} shows {got!r}, not {value!r}")
+                    filled[key] = got
+                if page.evaluate("document.body.dataset.submitted === 'yes'") or not page.url.startswith(url[:40]):
+                    raise ToolError(ErrorCode.VERIFICATION_FAILED, "the form was submitted or the page navigated away")
+                # Disconnect without closing: the window stays open for the user.
+        except ToolError:
+            proc.kill()
+            raise
+        except PwError as e:
+            proc.kill()
+            raise ToolError(ErrorCode.APPLICATION_UNAVAILABLE, f"browser error: {str(e).splitlines()[0]}") from None
+        return FillOut(page=args.page, filled=filled, pid=proc.pid, port=port,
+                       evidence=f"filled {len(filled)} field(s), each read back; NOT submitted; window left open "
+                                f"for you to review")
+
+
 def browser_tools() -> list[Tool]:
-    return [ReadTableTool(), ReadTextTool()]
+    return [ReadTableTool(), ReadTextTool(), FillFormTool()]
