@@ -1,6 +1,6 @@
 # ORION
 
-A general-purpose autonomous Windows computer-use agent (final-year project). See `CLAUDE.md`, `docs/12_WEEK_PLAN.md` and `STATUS.md` (every capability with its evidence).
+A general-purpose autonomous Windows computer-use agent (final-year project). See `docs/PROJECT_RULES.md`, `docs/12_WEEK_PLAN.md` and `STATUS.md` (every capability with its evidence).
 
 **Current stage: 9b (packaging and release).** ORION turns a goal into a validated plan, runs it through permissioned tools (files in its workspace, Notepad, Calculator, a local browser, clicking by what is visible), verifies the result, recovers from common problems (a dialog in the way, a lost tab, two matching buttons), and resumes safely after a crash. A kill switch (Ctrl+Alt+End or STOP) and dry-run mode are always available. Results: `benchmark/REPORT_v1.md` (40 tasks x 5 runs) and `research/reports/`.
 

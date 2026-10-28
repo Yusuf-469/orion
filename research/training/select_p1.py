@@ -1,6 +1,6 @@
 """The pre-registered P1-vs-P0 selection rule, applied as written (it was skipped in v1; see grounding_v1.md).
 
-Rule (CLAUDE.md, fixed before training): P1 ships only if it beats P0 on VALIDATION, with the paired
+Rule (project rules, fixed before training): P1 ships only if it beats P0 on VALIDATION, with the paired
 bootstrap 95% CI on the accuracy difference excluding 0; otherwise P0 ships and P1 is a negative result.
 Uses the already-trained models and their own operating points; no retraining, no test-set use for the
 decision (test numbers are printed for reference only).

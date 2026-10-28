@@ -3,7 +3,7 @@
 Statuses: planned / in progress / implemented-mock / implemented-real / verified.
 Last updated: 2026-10-24 (Stage 1 complete, awaiting gate approval).
 
-## Environment (VERIFIED 2026-10-24, `artifacts/env_audit_raw.txt`)
+## Environment (VERIFIED 2026-10-24, raw output kept locally, not published; regenerate with `scripts/env_audit.ps1`)
 Win 11 Home 10.0.26200 · i7-13650HX · 23.8 GB RAM · RTX 4060 Laptop 8 GB (~6 GB free at idle), driver 610.88 · 68 GB free disk · displays 1920×1080 @125% and @100%.
 Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pytest 9.1.1, pytest-timeout 2.4.0. **PyTorch in venv: not installed** (system torch is CPU-only 2.10.0+cpu).
 

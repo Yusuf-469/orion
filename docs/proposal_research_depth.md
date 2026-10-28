@@ -4,7 +4,7 @@
 **Date:** 2026-10-25.
 **Affects (if approved):** `docs/12_WEEK_PLAN.md` section 5 and Weeks 4 to 10; Stage 6 and Stage 3 scope. The spec and the planner stay authoritative until they are edited. This file only proposes.
 
-> Evidence labels follow `CLAUDE.md`: VERIFIED, ASSUMPTION, PROPOSED, UNTESTED. Everything here is PROPOSED unless marked otherwise. No numbers in this file are results.
+> Evidence labels follow `docs/PROJECT_RULES.md`: VERIFIED, ASSUMPTION, PROPOSED, UNTESTED. Everything here is PROPOSED unless marked otherwise. No numbers in this file are results.
 
 ---
 
@@ -132,7 +132,7 @@ A calibrated score is still not proof. Postcondition verification and confirmati
 Never cut: the frozen test split, the real-app evaluation set, honest reporting of where the conformal guarantee fails, or any safety rule.
 
 ## 10. Dependencies and approvals needed
-All of these need explicit approval under `CLAUDE.md`. None are installed by this proposal.
+All of these need explicit approval under the project rules. None are installed by this proposal.
 - CUDA PyTorch wheel in the venv (already pending in `STATUS.md`; about 2.5 to 3 GB).
 - `transformers` and `peft` for the backbone and LoRA (ASSUMPTION: both Apache-2.0; verify).
 - Backbone weights download (size and licence to verify in Week 8).

@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-24 · **Stage:** 0 (environment audit and design) · **Gate status:** awaiting approval
 
-Labels: `VERIFIED` (command run, output in `artifacts/env_audit_raw.txt` or quoted here), `ASSUMPTION` (believed, not checked), `PROPOSED` (design suggestion), `UNTESTED` (built or planned, not run).
+Labels: `VERIFIED` (command run, output quoted here; raw dumps are kept locally, not published (regenerate with `scripts/env_audit.ps1`)), `ASSUMPTION` (believed, not checked), `PROPOSED` (design suggestion), `UNTESTED` (built or planned, not run).
 
 ---
 
@@ -12,7 +12,7 @@ Labels: `VERIFIED` (command run, output in `artifacts/env_audit_raw.txt` or quot
 |---|---|---|
 | 0.1 | `C:\ORION` was **empty** at audit start (recursive listing returned nothing). Nothing existed to preserve. | VERIFIED |
 | 0.2 | `C:\ORION` is **not a git repository** (`fatal: not a git repository`). | VERIFIED |
-| 0.3 | `CLAUDE.md`, `docs/ORION_Master_Technical_Documentation.md` and `docs/12_WEEK_PLAN.md` **do not exist** on disk. The CLAUDE.md content and the 12-week planner were provided as pasted text in chat. **The master spec has not been provided.** | VERIFIED |
+| 0.3 | The project rules (now `docs/PROJECT_RULES.md`), `docs/ORION_Master_Technical_Documentation.md` and `docs/12_WEEK_PLAN.md` **do not exist** on disk. The rules and the 12-week planner were provided as pasted text in chat. **The master spec has not been provided.** | VERIFIED |
 | 0.4 | Because the spec is missing, references in this report to "spec section N" come from the planner's citations, not from the spec itself. **Resolved 2026-10-24:** spec copied from the user's Downloads into `docs/` (SHA-256 7BE8E54E…7726, identical to source); see section 10 for the spec-alignment check. | VERIFIED |
 | 0.5 | Files created during Stage 0: `scripts/env_audit.ps1` (read-only audit script), `artifacts/env_audit_raw.txt` (its output), `docs/stage0_report.md` (this file). No existing file was modified. | VERIFIED |
 
@@ -123,7 +123,7 @@ Invariants (PROPOSED, enforced in code and covered by `tests/safety/`):
 
 ```
 orion/
-  README.md LICENSE pyproject.toml CLAUDE.md STATUS.md
+  README.md LICENSE pyproject.toml STATUS.md
   docs/        architecture.md safety-and-privacy.md evaluation-protocol.md
                dataset-card-template.md model-card-template.md release-checklist.md
                ORION_Master_Technical_Documentation.md 12_WEEK_PLAN.md stage0_report.md
@@ -186,7 +186,7 @@ S8 is added because mixed DPI was measured in section 1. | PROPOSED
 | B2 | OCR plus exact/fuzzy text match only |
 | B3 | Pretrained grounding model, zero-shot (Florence-2 first; a 2B UI-VLM if it fits in VRAM) |
 | B4 | Rule-based fusion of B1 to B3 |
-| B5 | Simple visual matching (template/feature matching against a reference crop): **required by spec 6.6, missing from the planner and CLAUDE.md** |
+| B5 | Simple visual matching (template/feature matching against a reference crop): **required by spec 6.6, missing from the planner and the project rules** |
 | P0 | Candidates from B1, B2 and B3 → features (text similarity, role, position, size, visual-embedding similarity, source agreement) → gradient-boosted re-ranker (was P before 2026-10-27) |
 | P1 | Same candidates → fine-tuned SigLIP/CLIP-sized scorer (LoRA, listwise loss, hard negatives); ships only if it beats P0 on validation. Temperature scaling + conformal abstention (α = 0.1 primary) apply to the selected one |
 
@@ -204,7 +204,7 @@ S8 is added because mixed DPI was measured in section 1. | PROPOSED
 
 | Risk | Severity | Mitigation | Label |
 |---|---|---|---|
-| **Master spec missing**; the planner and CLAUDE.md cite sections that cannot be checked | High | You add `docs/ORION_Master_Technical_Documentation.md`; re-audit this report against it | VERIFIED (risk exists) |
+| **Master spec missing**; the planner and the project rules cite sections that cannot be checked | High | You add `docs/ORION_Master_Technical_Documentation.md`; re-audit this report against it | VERIFIED (risk exists) |
 | CPU-only PyTorch installed | Medium | Install the CUDA wheel in the venv in Week 2 (with approval) | VERIFIED |
 | ~ 1.9 GB VRAM used by the desktop at idle | Medium | Close GPU-heavy apps (games, Brave hardware accel) during experiments; record free VRAM in each run log | VERIFIED |
 | Mixed DPI (100% and 125%) | Medium | Per-monitor DPI-aware process; S8 criterion; record DPI in observations | VERIFIED |
@@ -244,7 +244,7 @@ Feasibility note (ASSUMPTION): Weeks 8 and 9 are the most overloaded. Dataset ge
 
 Steps needing approval are marked ⚠.
 
-1. Add the missing source docs: you place `docs/ORION_Master_Technical_Documentation.md`; I save the pasted planner as `docs/12_WEEK_PLAN.md` and the pasted instructions as `CLAUDE.md` (new files).
+1. Add the missing source docs: you place `docs/ORION_Master_Technical_Documentation.md`; I save the pasted planner as `docs/12_WEEK_PLAN.md` and the pasted instructions as `docs/PROJECT_RULES.md` (new files).
 2. ⚠ `git init`, add `.gitignore` (artifacts, workspace, weights, screenshots, .venv), first commit with these docs.
 3. ⚠ Create `.venv` from Python 3.11.9; install the Stage 1 set only: `PySide6`, `pydantic`, `python-json-logger`, `pytest`, `pytest-timeout`. Pin versions in `pyproject.toml`. (No torch, Playwright or UIA yet.)
 4. ⚠ Separately, when you choose: install the CUDA PyTorch wheel in the venv (~3 GB) and verify `torch.cuda.is_available()` → this resolves A3.
@@ -258,7 +258,7 @@ Steps needing approval are marked ⚠.
 The spec (`docs/ORION_Master_Technical_Documentation.md`) arrived after this report and Stage 1 were written. Each line below was checked against its text.
 
 ### 10.1 Stage 0 items the spec requires that the first audit missed (now done)
-Spec section 16, Stage 0, also asks for **permissions** and **installed applications**. Raw output: `artifacts/env_audit_addendum_raw.txt`.
+Spec section 16, Stage 0, also asks for **permissions** and **installed applications**. Raw output kept locally (contains machine identifiers).
 
 | Finding | Label |
 |---|---|
@@ -270,7 +270,7 @@ Spec section 16, Stage 0, also asks for **permissions** and **installed applicat
 ### 10.2 Gaps between the spec and the plan or Stage 1 code
 | Spec | Gap | Action | Label |
 |---|---|---|---|
-| 6.6 baselines | Spec lists **simple visual matching**; planner/CLAUDE.md omit it | Added as B5 in section 6; planner change needs your approval | PROPOSED |
+| 6.6 baselines | Spec lists **simple visual matching**; planner/project rules omit it | Added as B5 in section 6; planner change needs your approval | PROPOSED |
 | 11.6 emergency stop | "Communicate if an operation cannot be interrupted immediately." Stage 1 UI claimed "all tasks stopped" instantly | **Fixed**: label now says "stopping N task(s)…" until threads end; test `test_uninterruptible_action_reported_honestly` | VERIFIED (mock) |
 | 9 outcomes | Spec outcomes include **partially complete** and **unverified**; current statuses do not | Add to task-level outcome in Stage 3/4 (verification) | PROPOSED |
 | 10 persistence | User controls to **inspect and delete** task history and preferences | Stage 3 (with persistence work) | PROPOSED |

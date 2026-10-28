@@ -131,7 +131,7 @@ User goal --> Interaction layer --> Intent/context engine --> Planner (task grap
 ### 3.1 Repository layout (spec section 13, kept)
 ```
 orion/
-  README.md  LICENSE  pyproject.toml  CLAUDE.md  STATUS.md
+  README.md  LICENSE  pyproject.toml  STATUS.md
   docs/        architecture.md  safety-and-privacy.md  model-card-template.md
                dataset-card-template.md  evaluation-protocol.md  release-checklist.md
                ORION_Master_Technical_Documentation.md  12_WEEK_PLAN.md  stage0_report.md
@@ -237,7 +237,7 @@ Each week: **Goal / Tasks / Deliverables / Acceptance (gate) / Tests / Docs / De
 
 ### Week 1: Stage 0 environment audit and design (LIGHT)
 - **Goal.** Know the real machine and lock the design.
-- **Tasks.** (1) Read-only audit: Windows version, Python versions, Git, VS Code, CPU, RAM, free disk, GPU, VRAM, driver and CUDA, display resolution and scaling, installed PyTorch/Playwright/pywinauto/OCR. (2) Inspect the existing repo and files; preserve everything. (3) Create the repo skeleton, `CLAUDE.md`, `STATUS.md`, spec in `docs/`. (4) Licence, size and VRAM check for each stack candidate; pick the minimum viable set. (5) Confirm architecture and repo layout. (6) Define the vertical slice and fixtures list. (7) Draft the experiment protocol (section 5). (8) Draft the 12-week schedule against real hours. (9) Risk register.
+- **Tasks.** (1) Read-only audit: Windows version, Python versions, Git, VS Code, CPU, RAM, free disk, GPU, VRAM, driver and CUDA, display resolution and scaling, installed PyTorch/Playwright/pywinauto/OCR. (2) Inspect the existing repo and files; preserve everything. (3) Create the repo skeleton, `docs/PROJECT_RULES.md`, `STATUS.md`, spec in `docs/`. (4) Licence, size and VRAM check for each stack candidate; pick the minimum viable set. (5) Confirm architecture and repo layout. (6) Define the vertical slice and fixtures list. (7) Draft the experiment protocol (section 5). (8) Draft the 12-week schedule against real hours. (9) Risk register.
 - **Deliverables.** `docs/stage0_report.md`, environment report with raw command output, confirmed stack, repo skeleton committed.
 - **Acceptance.** Every finding labelled VERIFIED/ASSUMPTION/PROPOSED; no hardware claim without measurement; one representative end-to-end task chosen.
 - **Tests.** Environment script runs and its output is saved.
@@ -440,7 +440,7 @@ Each task has a known initial state, expected result, difficulty label, scoring 
 
 ## 12. Immediate next steps (Week 1, in order)
 
-1. Put the spec and this planner into `docs/`; save `CLAUDE.md`.
+1. Put the spec and this planner into `docs/`; save `docs/PROJECT_RULES.md`.
 2. Run the read-only environment audit and keep the raw output.
 3. Inspect the existing repo, list what exists, change nothing.
 4. Write `docs/stage0_report.md` with VERIFIED/ASSUMPTION/PROPOSED/UNTESTED labels.

@@ -1,6 +1,6 @@
 # Tools and Permissions Reference (Stage 2)
 
-Every action ORION takes goes through a **registered tool**. There is no generic shell, script or "run command" tool, and none will be added (CLAUDE.md safety rules).
+Every action ORION takes goes through a **registered tool**. There is no generic shell, script or "run command" tool, and none will be added (project safety rules).
 
 ## How a tool call is decided
 

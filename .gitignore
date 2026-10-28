@@ -10,8 +10,6 @@ workspace/
 data/
 logs/
 artifacts/*
-!artifacts/env_audit_raw.txt
-!artifacts/env_audit_addendum_raw.txt
 !artifacts/acceptance_*.json
 *.png
 *.jpg
@@ -39,3 +37,6 @@ research/**/out/
 build/
 dist/
 selftest.json
+
+# Local tooling config (not part of ORION)
+CLAUDE.md
