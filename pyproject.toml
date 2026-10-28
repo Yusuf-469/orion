@@ -13,9 +13,11 @@ dependencies = [
     "uiautomation>=2.0",   # Windows UI Automation (Notepad tools)
     "playwright>=1.44",    # local pages only; run `python -m playwright install chromium` once
     "rapidocr-onnxruntime>=1.4",   # local OCR for visual grounding (Apache-2.0; onnxruntime MIT)
+    "python-docx>=1.1",            # Word documents (MIT)
 ]
 
 [project.optional-dependencies]
+voice = ["faster-whisper>=1.0"]   # local speech recognition (MIT)
 dev = ["pytest>=8", "pytest-timeout>=2.3"]
 # Training the grounding scorer (sklearn) and the visual model (torch: install the CUDA build from
 # https://download.pytorch.org/whl/cu128 for the RTX GPU). Not needed to run ORION.
