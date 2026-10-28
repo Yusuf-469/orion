@@ -170,6 +170,17 @@ def test_template_plans_do_not_need_review(qapp, make_window, monkeypatch):
     assert goal(qapp, w, "list files") is not None
 
 
+def test_examples_menu_fills_goal_and_every_example_plans(qapp, make_window):
+    from orion.app.main_window import EXAMPLE_GOALS
+    from orion.planner.service import plan_request
+    w = make_window()
+    w._use_example(1)
+    assert w.goal_input.text() == EXAMPLE_GOALS[0] and w.examples.currentIndex() == 0
+    for text in EXAMPLE_GOALS:   # every example the app offers must be understood and valid
+        r = plan_request(w.planner, text, w.registry, w.policy, w.cfg.workspace_dir)
+        assert r.status == "ok", (text, r.message, r.issues)
+
+
 def test_history_delete_and_clear(qapp, make_window, monkeypatch):
     w = make_window()
     t1 = goal(qapp, w, "list files")

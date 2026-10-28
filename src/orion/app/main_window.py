@@ -58,15 +58,27 @@ TOOL_EXAMPLES: dict[str, dict[str, Any]] = {
 def build_registry() -> ToolRegistry:
     from orion.tools.browser import browser_tools
     from orion.tools.documents import document_tools
+    from orion.tools.windows.calculator import calculator_tools
     from orion.tools.windows.notepad import notepad_tools
 
     reg = ToolRegistry()
-    for t in [*file_tools(), LaunchAppTool(), *notepad_tools(), *browser_tools(), *document_tools()]:
+    for t in [*file_tools(), LaunchAppTool(), *notepad_tools(), *browser_tools(), *document_tools(),
+              *calculator_tools()]:
         reg.register(t)
     return reg
 
 
 DEMO_PAGES = Path(__file__).resolve().parents[3] / "demo" / "pages"
+
+EXAMPLE_GOALS = [
+    "save the table from sales.html as report.csv then summarize report.csv into summary.txt "
+    "then open summary.txt in notepad",
+    'type "Meeting moved to 4 pm" into summary.txt in notepad',
+    'fill the form on signup.html with name "Asha Rao" email "asha@example.com" message "See you there"',
+    "calculate 1250*12+300 in calculator",
+    'create a file notes.txt containing "buy milk" then copy notes.txt to backup/notes.txt',
+    "list files",
+]
 
 
 def install_demo_pages(workspace: Path) -> list[str]:
@@ -166,9 +178,16 @@ class MainWindow(QMainWindow):
         self.goal_input.returnPressed.connect(self.start_goal)
         self.goal_btn = QPushButton("Plan && run")
         self.goal_btn.clicked.connect(self.start_goal)
+        self.examples = QComboBox()
+        self.examples.addItem("Examples…")
+        for text in EXAMPLE_GOALS:
+            self.examples.addItem(text)
+        self.examples.setMaximumWidth(140)
+        self.examples.activated.connect(self._use_example)
         goal_row = QHBoxLayout()
         goal_row.addWidget(QLabel("Goal:"))
         goal_row.addWidget(self.goal_input, 1)
+        goal_row.addWidget(self.examples)
         goal_row.addWidget(self.goal_btn)
 
         self.info_label = QLabel()
@@ -292,6 +311,12 @@ class MainWindow(QMainWindow):
         w.setLayout(root)
         self.setCentralWidget(w)
         self._update_ks_label()
+
+    def _use_example(self, index: int) -> None:
+        if index > 0:
+            self.goal_input.setText(self.examples.itemText(index))
+            self.goal_input.setFocus()
+        self.examples.setCurrentIndex(0)
 
     def _append_log(self, text: str) -> None:
         self.log_pane.appendPlainText(f"{datetime.now():%H:%M:%S.%f}"[:-3] + "  " + text)

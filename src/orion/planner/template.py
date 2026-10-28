@@ -38,6 +38,7 @@ SUPPORTED_PHRASES = [
     'type "TEXT" into FILE in notepad',
     'close FILE in notepad',
     'fill the form on PAGE.html with name "..." email "..." (stops before submit)',
+    'calculate 1250*12+300 in calculator',
 ]
 
 _FIELD = re.compile(r'([A-Za-z][\w ]*?)\s*[:=]?\s*"([^"]*)"')
@@ -99,6 +100,8 @@ class TemplatePlanner:
             (re.compile(rf"^close\s+{_P}\s+in\s+notepad$", re.I), self._np_close),
             (re.compile(rf"^fill\s+(?:in\s+)?the\s+form\s+(?:on|in)\s+{_P}\s+with\s+(.+)$", re.I | re.S),
              self._fill_form),
+            (re.compile(r"^(?:calculate|compute|work out|what is)\s+([\d\s.,+\-*/x×÷]+?)"
+                        r"(?:\s+(?:in|on|using)\s+(?:the\s+)?calc(?:ulator)?)?\s*\??$", re.I), self._calculate),
             (re.compile(rf"^(?:create|make|write)\s+(?:a\s+)?(?:new\s+)?(?:text\s+)?(?:file|note)"
                         rf"(?:\s+(?:named|called))?\s+{_P}\s+(?:containing|with(?:\s+the)?\s+text|saying|with)"
                         rf"\s+(.+)$", re.I | re.S), self._create),
@@ -158,6 +161,10 @@ class TemplatePlanner:
         path = _resolve(_path(m, 0), d)
         d.add("notepad.close_tab", {"path": path}, f"close {path} in Notepad", writes=[path])
         d.open_in_notepad.discard(path.lower())
+
+    def _calculate(self, m, d):
+        expr = m.group(1).strip()
+        d.add("calculator.compute", {"expression": expr}, f"work out {expr} in Calculator")
 
     def _fill_form(self, m, d):
         page = _path(m, 0)

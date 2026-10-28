@@ -74,8 +74,10 @@ class TaskRunner:
                     continue
                 self.store.set_step_status(sid, Status.RUNNING)
                 self._emit(task_id, "INFO", "step_started", f"step {step['idx']}: {action.name}", step=step["idx"])
-                self.action_starts.append(time.monotonic())
+                started = time.monotonic()
                 res = executor.execute(action, token)
+                if res.executed:   # only actions that really ran (the executor re-checks the token first)
+                    self.action_starts.append(started)
                 if res.cancelled:
                     self.store.set_step_status(sid, Status.CANCELLED, res.evidence)
                     final = Status.CANCELLED
