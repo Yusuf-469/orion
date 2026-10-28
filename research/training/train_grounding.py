@@ -211,11 +211,13 @@ def main() -> int:
     ap.add_argument("--data", required=True)
     ap.add_argument("--model-out", default="artifacts/models/grounding_p0.joblib")
     ap.add_argument("--report", default="research/reports/grounding_p0_v1.json")
-    ap.add_argument("--visual", action="store_true", help="add frozen SigLIP similarity features")
+    ap.add_argument("--visual", action="store_true", help="add SigLIP similarity features")
+    ap.add_argument("--visual-file", default="siglip_sims.joblib",
+                    help="similarities file in the data folder (siglip_ft_sims.joblib for the fine-tuned P1)")
     a = ap.parse_args()
     global VIS
     if a.visual:
-        VIS = joblib.load(Path(a.data) / "siglip_sims.joblib")
+        VIS = joblib.load(Path(a.data) / a.visual_file)
     raw = Path(a.data, "samples.jsonl").read_bytes()
     samples = [json.loads(l) for l in raw.decode("utf-8").splitlines()]
     test = [s for s in samples if s["family"] in TEST_FAMILIES]

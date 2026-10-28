@@ -42,10 +42,15 @@ def main() -> int:
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
+    ap.add_argument("--adapter", help="LoRA adapter from finetune_siglip.py (P1); default = frozen SigLIP")
+    ap.add_argument("--out-name", default="siglip_sims.joblib")
     a = ap.parse_args()
     data = Path(a.data)
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     model = AutoModel.from_pretrained(MODEL_ID, torch_dtype=torch.float16 if dev == "cuda" else torch.float32).to(dev)
+    if a.adapter:
+        from peft import PeftModel
+        model = PeftModel.from_pretrained(model, a.adapter).merge_and_unload()
     model.eval()
     proc = AutoProcessor.from_pretrained(MODEL_ID)
     samples = [json.loads(l) for l in (data / "samples.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -75,7 +80,7 @@ def main() -> int:
             if n % 100 == 0:
                 print(f"{n}/{len(samples)} pages, {time.monotonic() - t0:.0f}s", flush=True)
     import joblib
-    joblib.dump(sims, data / "siglip_sims.joblib")
+    joblib.dump(sims, data / a.out_name)
     print(f"done: {len(sims)} instruction-target rows in {time.monotonic() - t0:.0f}s on {dev}")
     return 0
 
