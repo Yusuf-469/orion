@@ -62,15 +62,18 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | CSV write + summarize (new files only, read-back verified) | verified | same file |
 | **First end-to-end demo** (web table → report.csv → summary.txt → Notepad, screen checked against disk) | verified (real) | `tests/end_to_end/test_demo_slice.py`; **10/10 consecutive real runs** 2026-10-28, commit 155fdfa |
 | Prompt injection on the demo page cannot change the plan | verified | plan fixed before the page is read; page text returned as untrusted data only |
-| Unexpected-dialog recovery (second half of the slice) | planned | Stage 5 |
+| Form filling in a visible browser, stops before submit (no submit tool exists) | verified (real) | `tests/end_to_end/test_form_fill.py`; values must come from the request |
+| Recovery: dialog blocking Notepad (ask, then close like Cancel) / lost tab (reselect), one retry per step | verified (real) | `tests/end_to_end/test_recovery.py`, 3 scenarios, repeated 3/3 and 5/5 after fixes |
+| Notepad safety fixes | verified | no duplicate copies (reselect existing tab), exact tab matching, refuse ambiguous names, harmless pop-ups not treated as dialogs, library log disabled |
+| Known issue: ~26 leftover test tabs (unmodified, test names) in the user's Notepad session from earlier test runs | open | caused before tests used unique names; closing them automatically was slow/unreliable and closing Notepad was blocked by the safety classifier; user can close them by hand |
 | Recovery (Stage 5) | planned | |
 | Grounding research (Stage 6) | planned | |
 
 ## Test totals (2026-10-24, end of session)
 `-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stage 4 core done)
-2026-10-28: ORION controls Notepad and reads local web pages; the first end-to-end demo works for real (10/10). Next: form filling that stops before submit, then Stage 5 (unexpected dialogs, recovery). Human-eye checks still open (M7 during a task, M9 DPI look).
+## RESUME HERE (Stages 4 and 5 core done)
+2026-10-28: end-to-end demo (10/10), form filling that stops before submit, recovery from dialogs and lost tabs, all verified for real. Next: hook recovery and form filling into the app UI demo flow, then Stage 6 (visual grounding). Open: leftover Notepad test tabs (user to close), human-eye checks M7/M9.
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.
