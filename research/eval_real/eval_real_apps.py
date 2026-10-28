@@ -28,6 +28,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -48,6 +49,8 @@ APPS = {
     # added in v2, never inspected before measuring: a fresh check for the nested-element fix
     "charmap": ([os.path.join(SYS, "charmap.exe")], lambda n: n == "Character Map"),
 }
+# Controls that can show the signed-in user's identity are skipped (the v1 report captured one; scrubbed).
+PERSONAL = re.compile(r"signed in|account|profile|@|" + re.escape(os.environ.get("USERNAME", "\0")), re.I)
 CLICKABLE = {"ButtonControl", "MenuItemControl", "TabItemControl", "ListItemControl", "CheckBoxControl",
              "RadioButtonControl", "HyperlinkControl", "SplitButtonControl"}
 SIZES = {"calculator": [None, (420, 720)], "paint": [None, (1000, 700)], "charmap": [None]}
@@ -74,6 +77,8 @@ def controls(auto, win, rect: Box):
     keys, cands = [], []
     for c, _ in auto.WalkControl(win, maxDepth=14):
         if not c.Name or c.ControlTypeName in ("WindowControl", "TitleBarControl", "PaneControl"):
+            continue
+        if PERSONAL.search(c.Name):   # e.g. Paint's "Signed in as <name>": never stored in a report
             continue
         if c.AutomationId in _FRAME_IDS or c.GetParentControl().ControlTypeName == "TitleBarControl":
             continue
