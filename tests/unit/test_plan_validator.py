@@ -219,3 +219,19 @@ def test_topo_order_follows_dependencies():
         PlanStep(id="b", description="", tool_id="files.list", depends_on=["a"]),
     ])
     assert topo_order(plan) == ["a", "b", "c"]
+
+
+@pytest.mark.parametrize("request_text,warned", [
+    ("fill the form and submit it out/a.txt", True),
+    ("write out/a.txt then send it to bob", True),
+    ("buy the item out/a.txt", True),
+    ('fill the form with email "a@b.c" out/a.txt', False),
+    ("out/a.txt containing hi", False),
+])
+def test_parts_orion_never_does_are_announced_not_dropped(ctx, request_text, warned):
+    reg, ws = ctx
+    g = goal(request=request_text)
+    p = Plan(goal_id="g1", steps=[step("s1", "files.write_new", {"path": "out/a.txt", "content": "hi"},
+                                       postconditions=[FileExists(path="out/a.txt")])])
+    _, issues = errors(p, g, reg, ws)
+    assert any(i.code == "will_not_do" and i.severity == "warning" for i in issues) is warned

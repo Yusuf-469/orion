@@ -19,7 +19,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from benchmark.harness import ROOT, TASKS, Task, monitors, run_once
@@ -102,13 +102,20 @@ def summarize(rows: list[dict], env: dict, res: dict) -> dict:
         goal = [r for r in rs if r["orion_outcome"] and r["orion_outcome"] != "script_finished"
                 and TASK[r["task"]].expect == "complete"]
         if goal:
-            tp = sum(1 for r in goal if not r["passed"] and r["orion_outcome"] != "verified_complete")
-            fp = sum(1 for r in goal if r["passed"] and r["orion_outcome"] != "verified_complete")
+            # "flagged" = ORION reported a problem; "unverified" (no check available) is neither a claim of
+            # success nor of failure and is counted on its own (changed after run 20261028-220054; see report)
+            bad = ("failed", "blocked", "partially_complete", "cancelled")
+            tp = sum(1 for r in goal if not r["passed"] and r["orion_outcome"] in bad)
+            fp = sum(1 for r in goal if r["passed"] and r["orion_outcome"] in bad)
             fn = sum(1 for r in goal if not r["passed"] and r["orion_outcome"] == "verified_complete")
-            c["failure_detection"] = {"actual_failures": tp + fn, "flagged": tp + fp, "tp": tp, "fp": fp, "fn": fn,
+            unv = [r for r in goal if r["orion_outcome"] == "unverified"]
+            c["failure_detection"] = {"actual_failures": sum(not r["passed"] for r in goal), "flagged": tp + fp,
+                                      "tp": tp, "fp": fp, "fn": fn,
                                       "precision": round(tp / (tp + fp), 3) if tp + fp else None,
                                       "recall": round(tp / (tp + fn), 3) if tp + fn else None,
-                                      "false_success_claims": fn}
+                                      "false_success_claims": fn, "unverified_runs": len(unv),
+                                      "unverified_but_passed": sum(r["passed"] for r in unv)}
+        c["orion_outcomes"] = dict(sorted(Counter(r["orion_outcome"] or r["plan_status"] for r in rs).items()))
         s["conditions"][cond] = c
     per_task = defaultdict(dict)
     for r in rows:
@@ -148,7 +155,10 @@ def markdown(s: dict, run_id: str, runs: int) -> str:
         if "failure_detection" in c:
             fd = c["failure_detection"]
             bits.append(f"failure detection: {fd['actual_failures']} real failures, {fd['tp']} flagged by ORION, "
-                        f"{fd['false_success_claims']} false 'complete' claims, {fd['fp']} false alarms")
+                        f"{fd['false_success_claims']} false 'complete' claims, {fd['fp']} false alarms, "
+                        f"{fd['unverified_runs']} runs reported 'unverified' (no check available; "
+                        f"{fd['unverified_but_passed']} of them actually passed)")
+        bits.append("ORION's reported outcomes: " + ", ".join(f"{k} {v}" for k, v in c["orion_outcomes"].items()))
         out.append(f"- **{k}**: " + "; ".join(bits))
     r = s["resources"]
     out += ["", f"**Resources.** Peak RAM of the agent process {r['peak_rss_mb']} MB, mean CPU {r['mean_cpu_pct']}% "
@@ -169,7 +179,18 @@ def main() -> int:
     ap.add_argument("--only", nargs="*", default=[])
     ap.add_argument("--conditions", nargs="*", default=["C3", "C2", "C1", "A_norec"])
     ap.add_argument("--out", default=str(ROOT / "benchmark" / "results"))
+    ap.add_argument("--resummarize", help="rebuild summary.md/json of an existing results folder from runs.jsonl")
     a = ap.parse_args()
+    if a.resummarize:
+        d = Path(a.resummarize)
+        old = json.loads((d / "summary.json").read_text(encoding="utf-8"))
+        rows = [json.loads(l) for l in (d / "runs.jsonl").read_text(encoding="utf-8").splitlines()]
+        runs = max(r["run"] for r in rows) + 1
+        s = summarize(rows, old["environment"], old["resources"])
+        (d / "summary.json").write_text(json.dumps(s, indent=1), encoding="utf-8")
+        (d / "summary.md").write_text(markdown(s, d.name, runs), encoding="utf-8")
+        print(markdown(s, d.name, runs))
+        return 0
     from orion.grounding.screen import ensure_dpi_aware
     ensure_dpi_aware()
     run_id = time.strftime("%Y%m%d-%H%M%S")

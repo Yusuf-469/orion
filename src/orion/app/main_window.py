@@ -474,6 +474,9 @@ class MainWindow(QMainWindow):
         task_id = self.graph.create(res.goal, res.plan, res.planner, dry_run)
         self._start_thread(f"goal-{task_id}", self.graph.run, task_id, token, dry_run)
         self.goal_input.clear()
+        skipped = [i.message for i in res.issues if i.code == "will_not_do"]
+        if skipped:
+            self._show_info("Note: " + " ".join(skipped))
         return task_id
 
     def _check_interrupted(self) -> None:

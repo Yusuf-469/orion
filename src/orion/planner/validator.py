@@ -24,6 +24,8 @@ from orion.tools.registry import ToolRegistry
 
 # Arguments that name something a non-read-only tool changes.
 WRITE_ARGS = ("path", "dst")
+_NEVER_DONE = [(r"\bsubmit|\bsend\b|\bpost\b", "submit, send or post anything"),
+               (r"\bbuy\b|\bpurchase|\bpay\b", "buy or pay for anything")]
 USER_ONLY_ARGS = frozenset({"user_choice"})   # filled in by recovery from the user's answer, never by a planner
 _DUMMY = {str: "x", int: 0, float: 0.0, bool: False}
 
@@ -182,6 +184,11 @@ def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> 
                 err("intent_drift", f"plan changes {v!r}, which the request never mentions", s.id)
     for p in sorted(named - used):
         warn("intent_drift", f"the request mentions {p!r} but the plan never uses it")
+
+    # Parts of a request ORION never does (it has no tool for them): say so instead of silently dropping them.
+    for words, what in _NEVER_DONE:
+        if re.search(words, goal.request, re.I) and not any(re.search(words, s.tool_id, re.I) for s in plan.steps):
+            warn("will_not_do", f"ORION does not {what}; it will do the rest and stop before that")
 
     # Text a plan writes must come from the user's own words (seen with Phi-3.5: invented content).
     req = _squash(goal.request)
