@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.7",
     "uiautomation>=2.0",   # Windows UI Automation (Notepad tools)
     "playwright>=1.44",    # local pages only; run `python -m playwright install chromium` once
+    "rapidocr-onnxruntime>=1.4",   # local OCR for visual grounding (Apache-2.0; onnxruntime MIT)
 ]
 
 [project.optional-dependencies]
