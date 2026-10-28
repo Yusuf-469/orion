@@ -131,6 +131,58 @@ def learned(cache: dict, tau: float, margin: float = 0.0):
     return choose
 
 
+def all_scores(model, samples) -> list[tuple]:
+    """Per instruction: (probabilities, candidates, target box) for conformal analysis."""
+    out = []
+    for s in samples:
+        merged = candidates(s)
+        if not merged:
+            continue
+        all_ins = [v for base in s["instructions"] for v in variants(s, base)]
+        probs = model.predict_proba(np.array([r for ins in all_ins
+                                              for r in featurize(ins["text"], merged, W, H)]))[:, 1]
+        for k, ins in enumerate(all_ins):
+            tb = s["boxes"].get(ins["target_id"]) if ins["target_id"] else None
+            out.append((probs[k * len(merged):(k + 1) * len(merged)], merged, tb))
+    return out
+
+
+def conformal(cal: list[tuple], test: list[tuple], alpha: float) -> dict:
+    """Split conformal prediction sets over candidate locations.
+
+    Calibration uses instructions that HAVE a target: nonconformity = 1 - p(true element).
+    Set = candidates with p >= 1 - qhat, merged by location. ORION acts only when the set has exactly
+    one location. The coverage guarantee holds only for data like the calibration set (same layout
+    families); on held-out families it is measured, not promised.
+    """
+    scores = []
+    for p, cands, tb in cal:
+        if tb is not None:
+            true = [p[i] for i, c in enumerate(cands) if hit(c, tb)]
+            scores.append(1 - max(true) if true else 1.0)
+    n = len(scores)
+    qhat = float(np.quantile(scores, min(1.0, np.ceil((n + 1) * (1 - alpha)) / n), method="higher"))
+    covered = total = 0
+    sizes, counts = [], {"correct": 0, "wrong_click": 0, "missed": 0}
+    for p, cands, tb in test:
+        members = [cands[i] for i in np.where(p >= 1 - qhat)[0]]
+        locations = []
+        for c in sorted(members, key=lambda c: -c.box.area):
+            if all(c.box.iou(l.box) < 0.3 and not l.box.contains(*c.box.center) for l in locations):
+                locations.append(c)
+        sizes.append(len(locations))
+        if tb is not None:
+            total += 1
+            covered += any(hit(c, tb) for c in members)
+        counts[outcome(locations[0] if len(locations) == 1 else None, tb)] += 1
+    m = sum(counts.values())
+    return {"alpha": alpha, "qhat": round(qhat, 4), "target_coverage": 1 - alpha,
+            "empirical_coverage": round(covered / max(total, 1), 4), "mean_set_size": round(float(np.mean(sizes)), 3),
+            "act_if_single": {"accuracy": round(counts["correct"] / m, 4),
+                              "wrong_click_rate": round(counts["wrong_click"] / m, 4),
+                              "missed_rate": round(counts["missed"] / m, 4)}}
+
+
 def bootstrap_diff(a: list[bool], b: list[bool], reps=2000, seed=0) -> tuple[float, float]:
     rng = random.Random(seed)
     n, d = len(a), []
@@ -180,6 +232,13 @@ def main() -> int:
                "test": [evaluate(n, test, f) for n, f in rules] + [evaluate("P0 learned scorer", test,
                                                                            learned(test_cache, best_tau, best_margin))]}
     lo, hi = bootstrap_diff(results["test"][3]["_per"], results["test"][2]["_per"])
+    test_all = all_scores(model, test)
+    # Split validation BY PAGE (not by instruction): the 3 phrasings of an instruction are adjacent, so an
+    # instruction-level alternation would give calibration and check different phrasing mixes.
+    cal = all_scores(model, [s for i, s in enumerate(val) if i % 2 == 0])
+    in_dist = all_scores(model, [s for i, s in enumerate(val) if i % 2 == 1])
+    conformal_results = {f"alpha_{a}": {"same_families": conformal(cal, in_dist, a),
+                                         "heldout_families": conformal(cal, test_all, a)} for a in (0.1, 0.05)}
     for split in results.values():
         for r in split:
             r.pop("_per")
@@ -193,7 +252,12 @@ def main() -> int:
               "pages": {"train": len(train), "val": len(val), "test_heldout_families": len(test)},
               "test_families": sorted(TEST_FAMILIES), "train_rows": len(y), "positives": int(sum(y)),
               "abstain_threshold": best_tau, "ambiguity_margin": best_margin, "results": results,
-              "test_accuracy_gain_P0_vs_B4_95ci": [lo, hi]}
+              "test_accuracy_gain_P0_vs_B4_95ci": [lo, hi], "conformal": conformal_results}
+    for k, v in conformal_results.items():
+        for where, r in v.items():
+            print(f"CONFORMAL {k} {where:<17} coverage {r['empirical_coverage']:.1%} (target {r['target_coverage']:.0%})"
+                  f"  set size {r['mean_set_size']:.2f}  act-if-single: correct {r['act_if_single']['accuracy']:.1%}"
+                  f" wrong {r['act_if_single']['wrong_click_rate']:.1%}")
     Path(a.report).parent.mkdir(parents=True, exist_ok=True)
     Path(a.report).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for r in results["test"]:
