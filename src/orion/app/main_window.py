@@ -60,10 +60,11 @@ def build_registry() -> ToolRegistry:
     from orion.tools.documents import document_tools
     from orion.tools.windows.calculator import calculator_tools
     from orion.tools.windows.notepad import notepad_tools
+    from orion.tools.windows.screen_click import screen_tools
 
     reg = ToolRegistry()
     for t in [*file_tools(), LaunchAppTool(), *notepad_tools(), *browser_tools(), *document_tools(),
-              *calculator_tools()]:
+              *calculator_tools(), *screen_tools()]:
         reg.register(t)
     return reg
 
@@ -76,6 +77,7 @@ EXAMPLE_GOALS = [
     'type "Meeting moved to 4 pm" into summary.txt in notepad',
     'fill the form on signup.html with name "Asha Rao" email "asha@example.com" message "See you there"',
     "calculate 1250*12+300 in calculator",
+    "click Export in the canvas demo",
     'create a file notes.txt containing "buy milk" then copy notes.txt to backup/notes.txt',
     "list files",
 ]

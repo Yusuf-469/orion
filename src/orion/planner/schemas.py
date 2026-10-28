@@ -39,6 +39,7 @@ class FileContains(_Strict):
     kind: Literal["file_contains"] = "file_contains"
     path: str
     text: str
+    ignore_case: bool = False
 
 
 class FilesIdentical(_Strict):

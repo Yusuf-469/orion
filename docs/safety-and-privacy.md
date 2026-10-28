@@ -27,6 +27,13 @@
 - The app can use the LLM planner only when `planner = "llm"` is set in `orion.toml`. Every LLM plan is shown in a review dialog (default **No**) before anything runs; plans that fail validation are never offered.
 - Ollama's server (`ollama serve`) runs as a background process; the tray app's own server start failed on this machine on 2026-10-27, so the server was started directly. End it from Task Manager (`ollama.exe`), or uninstall with `winget uninstall Ollama.Ollama`. The model is stored under `%USERPROFILE%\.ollama\models` (about 2.2 GB).
 
+## Seeing and clicking (added 2026-10-28)
+- **Screenshots:** only of the one window ORION is working in (never the whole screen), kept in memory for OCR and never written to disk. OCR runs locally (RapidOCR, Apache-2.0, CPU).
+- **screen.click** works only in allowlisted windows (currently only ORION's own canvas demo app). Adding an app needs a safety review.
+- It abstains when no visible label matches well or when two places match almost equally; it never clicks the window frame's own Minimize/Maximize/Close; before a mouse click it checks that its window is really the one under that point, and it puts the cursor back afterwards.
+- **Calculator** is controlled through UI Automation in ORION's own new window, which ORION closes afterwards.
+- **Notepad:** ORION only reads or writes the tab it opened itself, matched by exact name; it refuses when several tabs share that name, never opens duplicate copies, and backs up a file before replacing its text.
+
 ## What is logged
 Task titles, tool ids and arguments (redacted), statuses, evidence strings (file paths, sizes, hash prefixes, window titles), errors, kill-switch use. Stored in `<data_dir>/logs/orion.jsonl` and `<data_dir>/orion.db` (gitignored). File contents read by `files.read` are not logged (evidence has only size and hash). **However**, the step name shows the tool arguments (redacted, cut to 80 characters), so the first part of the text given to `files.write_new` does appear in the log and DB.
 

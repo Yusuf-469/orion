@@ -59,7 +59,7 @@ class Verifier:
             if not p.is_file():
                 return CheckResult(False, f"file_contains {c.path}: file missing")
             text = p.read_bytes().decode("utf-8-sig", errors="replace")
-            ok = c.text in text
+            ok = (c.text.lower() in text.lower()) if c.ignore_case else (c.text in text)
             return CheckResult(ok, f"file_contains {c.path}: " + ("text found" if ok else "text NOT found"))
         if isinstance(c, FilesIdentical):
             a, b = resolve_in_workspace(ws, c.a), resolve_in_workspace(ws, c.b)

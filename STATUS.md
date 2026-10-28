@@ -65,15 +65,18 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Form filling in a visible browser, stops before submit (no submit tool exists) | verified (real) | `tests/end_to_end/test_form_fill.py`; values must come from the request |
 | Recovery: dialog blocking Notepad (ask, then close like Cancel) / lost tab (reselect), one retry per step | verified (real) | `tests/end_to_end/test_recovery.py`, 3 scenarios, repeated 3/3 and 5/5 after fixes |
 | Notepad safety fixes | verified | no duplicate copies (reselect existing tab), exact tab matching, refuse ambiguous names, harmless pop-ups not treated as dialogs, library log disabled |
-| Known issue: ~26 leftover test tabs (unmodified, test names) in the user's Notepad session from earlier test runs | open | caused before tests used unique names; closing them automatically was slow/unreliable and closing Notepad was blocked by the safety classifier; user can close them by hand |
+| Leftover test tabs in the user's Notepad session | resolved | 2026-10-28: session back to 5 tabs, 0 test tabs; tests now use unique names and verify cleanup |
 | Recovery (Stage 5) | planned | |
-| Grounding research (Stage 6) | planned | |
+| Calculator control (UIA Invoke, own window, display checked against own maths) | verified (real) | `tests/end_to_end/test_calculator.py` |
+| Examples menu in the app | verified (offscreen) | every example plans validly (`test_goal_ui.py`) |
+| **Visual grounding v1** (UIA + local OCR, rule-based fusion with abstention) | verified (real) | `tests/end_to_end/test_visual_click.py`: clicks buttons that only exist as pixels; refuses a missing button; never confuses "Close Report" with the window's Close; also verified on the 125% monitor (manual probe 2026-10-28) |
+| Grounding research: dataset, learned scorer (P0/P1), conformal abstention | planned | v1 above is baseline B4; next |
 
 ## Test totals (2026-10-24, end of session)
 `-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stages 4 and 5 core done)
-2026-10-28: end-to-end demo (10/10), form filling that stops before submit, recovery from dialogs and lost tabs, all verified for real. Next: hook recovery and form filling into the app UI demo flow, then Stage 6 (visual grounding). Open: leftover Notepad test tabs (user to close), human-eye checks M7/M9.
+## RESUME HERE (Stage 6 started)
+2026-10-28: ORION clicks buttons it can only see (canvas demo, OCR), controls Calculator, fills forms, recovers from dialogs. Next: grow visual grounding into the learned scorer (render synthetic pages, P0 re-ranker, then P1 fine-tune + conformal abstention). Open: human-eye checks M7/M9.
 
 ## Open issues
 - Spec-alignment gaps to schedule: B5 visual-matching baseline (planner edit pending approval), "partially complete"/"unverified" outcomes (Stage 3/4), history inspect/delete controls (Stage 3). See `docs/stage0_report.md` §10.

@@ -39,6 +39,7 @@ SUPPORTED_PHRASES = [
     'close FILE in notepad',
     'fill the form on PAGE.html with name "..." email "..." (stops before submit)',
     'calculate 1250*12+300 in calculator',
+    'click Export in the canvas demo  (finds the button by what is visible)',
 ]
 
 _FIELD = re.compile(r'([A-Za-z][\w ]*?)\s*[:=]?\s*"([^"]*)"')
@@ -70,6 +71,7 @@ class _Draft:
     launches: bool = False
     last_path: str | None = None
     open_in_notepad: set = field(default_factory=set)
+    canvas_open: bool = False
 
     def add(self, tool: str, args: dict, desc: str, post=(), *, writes=(), checkpoint=False) -> str:
         sid = f"s{len(self.steps) + 1}"
@@ -100,6 +102,9 @@ class TemplatePlanner:
             (re.compile(rf"^close\s+{_P}\s+in\s+notepad$", re.I), self._np_close),
             (re.compile(rf"^fill\s+(?:in\s+)?the\s+form\s+(?:on|in)\s+{_P}\s+with\s+(.+)$", re.I | re.S),
              self._fill_form),
+            (re.compile(r"^open\s+(?:the\s+)?canvas\s+demo(?:\s+app)?$", re.I), self._open_canvas),
+            (re.compile(r"^click\s+(?:on\s+)?(?:the\s+)?(.+?)(?:\s+button)?\s+in\s+(?:the\s+)?canvas\s+demo"
+                        r"(?:\s+app)?$", re.I), self._click_canvas),
             (re.compile(r"^(?:calculate|compute|work out|what is)\s+([\d\s.,+\-*/x×÷]+?)"
                         r"(?:\s+(?:in|on|using)\s+(?:the\s+)?calc(?:ulator)?)?\s*\??$", re.I), self._calculate),
             (re.compile(rf"^(?:create|make|write)\s+(?:a\s+)?(?:new\s+)?(?:text\s+)?(?:file|note)"
@@ -161,6 +166,18 @@ class TemplatePlanner:
         path = _resolve(_path(m, 0), d)
         d.add("notepad.close_tab", {"path": path}, f"close {path} in Notepad", writes=[path])
         d.open_in_notepad.discard(path.lower())
+
+    def _open_canvas(self, m, d):
+        if not d.canvas_open:
+            d.add("demo.open_canvas_app", {"log": "canvas_clicks.log"}, "open the canvas demo app")
+            d.canvas_open = True
+
+    def _click_canvas(self, m, d):
+        target = m.group(1).strip().strip("\"'")
+        self._open_canvas(m, d)
+        d.add("screen.click", {"window": "ORION Canvas Demo", "target": target},
+              f"click '{target}' in the canvas demo (found by what is visible)",
+              [FileContains(path="canvas_clicks.log", text=f"clicked {target}", ignore_case=True)])
 
     def _calculate(self, m, d):
         expr = m.group(1).strip()
