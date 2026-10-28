@@ -11,7 +11,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from orion.planner.schemas import AppWindowOpen, FileAbsent, FileContains, FileExists, FilesIdentical
+from orion.planner.schemas import (
+    AppWindowOpen, FileAbsent, FileContains, FileExists, FilesIdentical, NotepadShows,
+)
 from orion.tools.errors import ToolError
 from orion.tools.files.workspace import resolve_in_workspace
 
@@ -67,6 +69,20 @@ class Verifier:
             ha, hb = _sha(a), _sha(b)
             return CheckResult(ha == hb, f"files_identical {c.a} {c.b}: " +
                                (f"sha256 {ha[:12]} both" if ha == hb else "DIFFERENT"))
+        if isinstance(c, NotepadShows):
+            if sys.platform != "win32":
+                return CheckResult(False, "notepad_shows: unsupported on this OS")
+            from orion.tools.windows.notepad import _norm_text, read_tab_text
+            p = resolve_in_workspace(ws, c.path)
+            if not p.is_file():
+                return CheckResult(False, f"notepad_shows {c.path}: file missing")
+            shown = read_tab_text(p.name)
+            if shown is None:
+                return CheckResult(False, f"notepad_shows {c.path}: not the active Notepad tab")
+            disk = _norm_text(p.read_text(encoding="utf-8-sig", errors="replace"))
+            ok = shown.rstrip("\n") == disk.rstrip("\n")
+            return CheckResult(ok, f"notepad_shows {c.path}: " +
+                               (f"screen matches disk ({len(disk)} chars)" if ok else "screen DIFFERS from disk"))
         if isinstance(c, AppWindowOpen):
             if sys.platform != "win32":
                 return CheckResult(False, "app_window_open: unsupported on this OS")

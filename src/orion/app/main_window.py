@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import threading
+from pathlib import Path
 from datetime import datetime
 from typing import Any
 
@@ -54,10 +56,30 @@ TOOL_EXAMPLES: dict[str, dict[str, Any]] = {
 
 
 def build_registry() -> ToolRegistry:
+    from orion.tools.browser import browser_tools
+    from orion.tools.documents import document_tools
+    from orion.tools.windows.notepad import notepad_tools
+
     reg = ToolRegistry()
-    for t in [*file_tools(), LaunchAppTool()]:
+    for t in [*file_tools(), LaunchAppTool(), *notepad_tools(), *browser_tools(), *document_tools()]:
         reg.register(t)
     return reg
+
+
+DEMO_PAGES = Path(__file__).resolve().parents[3] / "demo" / "pages"
+
+
+def install_demo_pages(workspace: Path) -> list[str]:
+    """Copy demo pages into workspace/pages/ (only missing ones; never overwrites)."""
+    added = []
+    if DEMO_PAGES.is_dir():
+        dest = workspace / "pages"
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in DEMO_PAGES.glob("*.html"):
+            if not (dest / f.name).exists():
+                shutil.copyfile(f, dest / f.name)
+                added.append(f.name)
+    return added
 
 
 class _EventBridge(QObject):
@@ -104,6 +126,7 @@ class MainWindow(QMainWindow):
         self._ks_poll.timeout.connect(self._update_ks_label)
 
         cfg.workspace_dir.mkdir(parents=True, exist_ok=True)
+        install_demo_pages(cfg.workspace_dir)
         self.registry = build_registry()
         self.confirmer = QtConfirmer(self)
         self.policy = PolicyEngine(frozenset(cfg.granted_permissions), cfg.confirm_reversible)

@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from orion.planner.schemas import (
-    AppWindowOpen, Constraints, FileAbsent, FileContains, FileExists, FilesIdentical, Goal, Plan, PlanStep,
+    AppWindowOpen, Constraints, FileAbsent, FileContains, FileExists, FilesIdentical, Goal, NotepadShows, Plan,
+    PlanStep,
 )
 from orion.planner.service import Proposal
 
@@ -31,6 +32,11 @@ SUPPORTED_PHRASES = [
     'list files [in DIR]',
     'delete NAME',
     'open notepad | calculator | paint',
+    'save the table from PAGE.html as FILE.csv',
+    'summarize FILE.csv into FILE.txt',
+    'open FILE in notepad',
+    'type "TEXT" into FILE in notepad',
+    'close FILE in notepad',
 ]
 
 
@@ -59,6 +65,7 @@ class _Draft:
     deletes: bool = False
     launches: bool = False
     last_path: str | None = None
+    open_in_notepad: set = field(default_factory=set)
 
     def add(self, tool: str, args: dict, desc: str, post=(), *, writes=(), checkpoint=False) -> str:
         sid = f"s{len(self.steps) + 1}"
@@ -80,6 +87,13 @@ class TemplatePlanner:
 
     def __init__(self) -> None:
         self._rules: list[tuple[re.Pattern, Callable[[re.Match, _Draft], None]]] = [
+            (re.compile(rf"^(?:save|extract|export|get)\s+the\s+table\s+(?:from|on|in)\s+{_P}\s+(?:as|into|to)\s+{_P}$",
+                        re.I), self._table_to_csv),
+            (re.compile(rf"^summari[sz]e\s+{_P}\s+(?:into|to|as)\s+{_P}$", re.I), self._summarize),
+            (re.compile(rf"^open\s+{_P}\s+in\s+notepad$", re.I), self._np_open),
+            (re.compile(rf"^(?:type|write|put)\s+(?:\"([^\"]*)\"|'([^']*)'|(.+?))\s+into\s+{_P}\s+(?:in|using|with)\s+"
+                        rf"notepad$", re.I | re.S), self._np_type),
+            (re.compile(rf"^close\s+{_P}\s+in\s+notepad$", re.I), self._np_close),
             (re.compile(rf"^(?:create|make|write)\s+(?:a\s+)?(?:new\s+)?(?:text\s+)?(?:file|note)"
                         rf"(?:\s+(?:named|called))?\s+{_P}\s+(?:containing|with(?:\s+the)?\s+text|saying|with)"
                         rf"\s+(.+)$", re.I | re.S), self._create),
@@ -103,6 +117,42 @@ class TemplatePlanner:
         ]
 
     # --- rules -----------------------------------------------------------------
+
+    def _table_to_csv(self, m, d):
+        page, csv_path = _path(m, 0), _path(m, 3)
+        rid = d.add("browser.read_table", {"page": page}, f"read the table on {page}")
+        d.add("docs.write_csv", {"path": csv_path, "headers": f"${{{rid}.headers}}", "rows": f"${{{rid}.rows}}"},
+              f"save the table as {csv_path}", [FileExists(path=csv_path)], writes=[csv_path])
+        d.last_path = csv_path
+
+    def _summarize(self, m, d):
+        src, dst = _resolve(_path(m, 0), d), _path(m, 3)
+        d.add("docs.summarize_csv", {"src": src, "dst": dst}, f"summarize {src} into {dst}",
+              [FileContains(path=dst, text="Rows:")], writes=[dst])
+        d.last_path = dst
+
+    def _np_open(self, m, d):
+        path = _resolve(_path(m, 0), d)
+        d.add("notepad.open_file", {"path": path}, f"open {path} in Notepad", [NotepadShows(path=path)],
+              writes=[path])
+        d.last_path = path
+        d.open_in_notepad.add(path.lower())
+
+    def _np_type(self, m, d):
+        text = next(g for g in m.groups()[0:3] if g is not None)
+        path = _resolve(_path(m, 3), d)
+        if path.lower() not in d.open_in_notepad:
+            d.add("notepad.open_file", {"path": path}, f"open {path} in Notepad", [NotepadShows(path=path)],
+                  writes=[path])
+            d.open_in_notepad.add(path.lower())
+        d.add("notepad.set_text", {"path": path, "text": text}, f"type the text into {path} in Notepad and save",
+              [FileContains(path=path, text=text), NotepadShows(path=path)], writes=[path])
+        d.last_path = path
+
+    def _np_close(self, m, d):
+        path = _resolve(_path(m, 0), d)
+        d.add("notepad.close_tab", {"path": path}, f"close {path} in Notepad", writes=[path])
+        d.open_in_notepad.discard(path.lower())
 
     def _create(self, m, d):
         path, text = _path(m, 0), m.group(4).strip().strip('"\'')
@@ -211,7 +261,10 @@ def _final_checks(steps: list[PlanStep]):
     checks = []
     for i, s in enumerate(steps):
         later_deleted = {t.args.get("path") for t in steps[i + 1:] if t.tool_id == "files.delete"}
+        later_closed = {t.args.get("path") for t in steps[i + 1:] if t.tool_id == "notepad.close_tab"}
         for c in s.postconditions:
+            if isinstance(c, NotepadShows) and c.path in later_closed:
+                continue   # a later step closes that tab on purpose
             paths = {getattr(c, a) for a in ("path", "a", "b") if hasattr(c, a)}
             if isinstance(c, FileAbsent) or not (paths & later_deleted):
                 checks.append(c)

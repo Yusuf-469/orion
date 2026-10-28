@@ -17,7 +17,8 @@ from orion.tools.base import Permission
 DEFAULT_CONFIG_NAME = "orion.toml"
 
 # Least privilege: deleting is not granted unless the user adds it in orion.toml.
-DEFAULT_PERMISSIONS = (Permission.FILES_READ, Permission.FILES_WRITE, Permission.APP_LAUNCH)
+DEFAULT_PERMISSIONS = (Permission.FILES_READ, Permission.FILES_WRITE, Permission.APP_LAUNCH,
+                       Permission.APP_CONTROL, Permission.BROWSER_READ)
 
 
 class OrionConfig(BaseModel):

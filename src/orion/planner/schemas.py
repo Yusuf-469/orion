@@ -52,7 +52,13 @@ class AppWindowOpen(_Strict):
     app: Literal["notepad", "calculator", "paint"]
 
 
-Check = Annotated[Union[FileExists, FileAbsent, FileContains, FilesIdentical, AppWindowOpen],
+class NotepadShows(_Strict):
+    """ORION's Notepad tab for `path` is active and shows exactly the file's text on disk."""
+    kind: Literal["notepad_shows"] = "notepad_shows"
+    path: str
+
+
+Check = Annotated[Union[FileExists, FileAbsent, FileContains, FilesIdentical, AppWindowOpen, NotepadShows],
                   Field(discriminator="kind")]
 
 

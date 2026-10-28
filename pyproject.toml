@@ -10,6 +10,8 @@ requires-python = ">=3.11"
 dependencies = [
     "PySide6-Essentials>=6.8",
     "pydantic>=2.7",
+    "uiautomation>=2.0",   # Windows UI Automation (Notepad tools)
+    "playwright>=1.44",    # local pages only; run `python -m playwright install chromium` once
 ]
 
 [project.optional-dependencies]

@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import get_args, get_origin
 from pathlib import Path, PureWindowsPath
 from typing import Any, Literal
 
 from pydantic import ValidationError
 
 from orion.planner.schemas import (
-    FileAbsent, FileContains, FileExists, FilesIdentical, Goal, Plan, PlanStep, parse_ref,
+    FileAbsent, FileContains, FileExists, FilesIdentical, Goal, NotepadShows, Plan, PlanStep, parse_ref,
 )
 from orion.policy.engine import Decision, PolicyEngine
 from orion.tools.base import SideEffect
@@ -36,6 +37,15 @@ class PlanIssue:
     def __str__(self) -> str:
         where = f"[{self.step_id}] " if self.step_id else ""
         return f"{self.severity}: {self.code}: {where}{self.message}"
+
+
+def _dummy(ann):
+    """A placeholder of the right shape for a referenced output, e.g. list[list[str]] -> [["x"]]."""
+    if get_origin(ann) is list:
+        inner = get_args(ann)
+        item = _dummy(inner[0]) if inner else "x"
+        return None if item is None else [item]
+    return _DUMMY.get(ann)
 
 
 def _norm(p: str) -> str:
@@ -61,7 +71,7 @@ def request_paths(request: str) -> set[str]:
 
 
 def _check_paths(check) -> list[str]:
-    if isinstance(check, (FileExists, FileAbsent, FileContains)):
+    if isinstance(check, (FileExists, FileAbsent, FileContains, NotepadShows)):
         return [check.path]
     if isinstance(check, FilesIdentical):
         return [check.a, check.b]
@@ -156,7 +166,7 @@ def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> 
     named = request_paths(goal.request)
     used: set[str] = set()
     for s in plan.steps:
-        for k in ("path", "src", "dst"):
+        for k in ("path", "src", "dst", "page"):
             v = s.args.get(k)
             if isinstance(v, str) and parse_ref(v) is None:
                 used.add(_norm(v))
@@ -175,8 +185,8 @@ def _check_intent(plan: Plan, goal: Goal, registry: ToolRegistry, err, warn) -> 
     # Text a plan writes must come from the user's own words (seen with Phi-3.5: invented content).
     req = _squash(goal.request)
     for s in plan.steps:
-        v = s.args.get("content")
-        if s.tool_id == "files.write_new" and isinstance(v, str) and parse_ref(v) is None:
+        v = s.args.get("content", s.args.get("text"))
+        if s.tool_id in ("files.write_new", "notepad.set_text") and isinstance(v, str) and parse_ref(v) is None:
             if not v.strip() and "empty" not in req:
                 # '' is a substring of everything; an empty file must be asked for explicitly.
                 err("intent_drift", "file content is empty but the request did not ask for an empty file", s.id)
@@ -215,9 +225,9 @@ def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by
         if field not in out_fields:
             err("bad_reference", f"{src_tool} has no output field {field!r}", s.id)
             continue
-        dummy = _DUMMY.get(out_fields[field].annotation)
+        dummy = _dummy(out_fields[field].annotation)
         if dummy is None:
-            err("bad_reference", f"output field {field!r} is not a simple value", s.id)
+            err("bad_reference", f"output field {field!r} cannot be passed between steps", s.id)
             continue
         if spec.side_effect is not SideEffect.READ_ONLY and k in WRITE_ARGS:
             err("unchecked_write_target", f"argument {k!r} of a changing step must be a literal path", s.id)
