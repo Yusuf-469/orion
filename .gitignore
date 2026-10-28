@@ -28,6 +28,9 @@ research/**/out/
 *.safetensors
 *.bin
 
+# uiautomation library log (may contain control names from the screen)
+@AutomationLog.txt
+
 # Secrets
 .env
 *.key

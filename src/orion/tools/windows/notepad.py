@@ -36,6 +36,9 @@ class _uia:
 
     def __enter__(self):
         import uiautomation as auto
+        # The library would otherwise write '@AutomationLog.txt' into the working directory, which can
+        # contain control names from the user's screen. Discard it.
+        auto.Logger.SetLogFile(os.devnull)
         self._init = auto.UIAutomationInitializerInThread(debug=False)
         return auto
 
