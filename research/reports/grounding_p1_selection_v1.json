@@ -1,0 +1,92 @@
+{
+ "rule": "P1 ships iff validation paired-bootstrap 95% CI of accuracy(P1) - accuracy(P0) excludes 0 (and is positive)",
+ "models": {
+  "P0": {
+   "val": {
+    "n": 1478,
+    "accuracy": 0.91,
+    "wrong_click_rate": 0.0115
+   },
+   "test": {
+    "n": 3960,
+    "accuracy": 0.9035,
+    "wrong_click_rate": 0.0083
+   }
+  },
+  "P0+frozen SigLIP": {
+   "val": {
+    "n": 1478,
+    "accuracy": 0.9154,
+    "wrong_click_rate": 0.0115
+   },
+   "test": {
+    "n": 3960,
+    "accuracy": 0.925,
+    "wrong_click_rate": 0.0076
+   }
+  },
+  "P1 fine-tuned SigLIP": {
+   "val": {
+    "n": 1478,
+    "accuracy": 0.9317,
+    "wrong_click_rate": 0.0108
+   },
+   "test": {
+    "n": 3960,
+    "accuracy": 0.926,
+    "wrong_click_rate": 0.0096
+   }
+  }
+ },
+ "comparisons": {
+  "val: P1 - P0": {
+   "accuracy_diff": 0.0217,
+   "accuracy_diff_95ci": [
+    0.0074,
+    0.0365
+   ],
+   "wrong_click_diff": -0.0007,
+   "wrong_click_diff_95ci": [
+    -0.0054,
+    0.0041
+   ]
+  },
+  "val: P1 - P0+frozen SigLIP": {
+   "accuracy_diff": 0.0162,
+   "accuracy_diff_95ci": [
+    0.0034,
+    0.0291
+   ],
+   "wrong_click_diff": -0.0007,
+   "wrong_click_diff_95ci": [
+    -0.0047,
+    0.0034
+   ]
+  },
+  "test: P1 - P0": {
+   "accuracy_diff": 0.0225,
+   "accuracy_diff_95ci": [
+    0.0126,
+    0.0328
+   ],
+   "wrong_click_diff": 0.0013,
+   "wrong_click_diff_95ci": [
+    -0.002,
+    0.0048
+   ]
+  },
+  "test: P1 - P0+frozen SigLIP": {
+   "accuracy_diff": 0.001,
+   "accuracy_diff_95ci": [
+    -0.0073,
+    0.0091
+   ],
+   "wrong_click_diff": 0.002,
+   "wrong_click_diff_95ci": [
+    -0.001,
+    0.0056
+   ]
+  }
+ },
+ "decision_by_rule": "P1 passes the rule"
+}

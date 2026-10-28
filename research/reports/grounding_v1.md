@@ -17,11 +17,23 @@
 | B4 metadata + OCR (rules; product before) | 63.1% | 1.0% | 35.9% | same |
 | **P0 learned scorer (product now)** | **90.3%** | **0.8%** | 8.8% | same |
 | P0 + frozen SigLIP features | 92.5% | 0.8% | 6.7% | grounding_p0_visual_v1.json |
-| P1: P0 + LoRA fine-tuned SigLIP | 92.6% | 1.0% | 6.4% | grounding_p1_v1.json |
+| P1: P0 + LoRA fine-tuned SigLIP | 92.6% | 1.0% | 6.4% | grounding_p1_v1.json (see Correction below) |
 
 P0 vs B4, paired bootstrap 95% CI on the accuracy difference: **+25.8 to +28.7 points**.
 
-**Decisions.** P0 is in the product. Frozen SigLIP adds about 2 points without fewer wrong clicks; not enabled yet (an 800 MB model at click time). P1 fine-tuning gave no gain over frozen SigLIP and slightly more wrong clicks: **not shipped** (pre-registered rule; a negative result). Remaining wrong clicks are mostly duplicate labels and ambiguity, which visual similarity does not resolve.
+**Decisions (as first recorded, 2026-10-28; corrected below).** P0 is in the product. Frozen SigLIP adds about 2 points without fewer wrong clicks; not enabled yet (an 800 MB model at click time). ~~P1 fine-tuning gave no gain over frozen SigLIP and slightly more wrong clicks: not shipped (pre-registered rule; a negative result).~~ Remaining wrong clicks are mostly duplicate labels and ambiguity, which visual similarity does not resolve.
+
+## Correction (2026-10-29): the pre-registered P1 rule had not been applied
+The rule fixed before training says: P1 ships only if it beats **P0** on **validation**, with the paired bootstrap 95% CI on the accuracy difference excluding 0. The v1 decision instead compared P1 with *frozen SigLIP* on the *held-out test set*, which is the wrong baseline and the wrong split. `research/training/select_p1.py` now applies the rule as written to the same trained models (no retraining; test numbers for reference only) [`grounding_p1_selection_v1.json`]:
+
+| Comparison | Accuracy difference (95% CI) | Wrong-click difference (95% CI) |
+|---|---|---|
+| **Validation: P1 - P0 (the rule)** | **+2.2 pts (+0.7 to +3.7)** | -0.1 pts (-0.5 to +0.4) |
+| Validation: P1 - P0+frozen SigLIP | +1.6 pts (+0.3 to +2.9) | -0.1 pts (-0.5 to +0.3) |
+| Held-out: P1 - P0 | +2.2 pts (+1.3 to +3.3) | +0.1 pts (-0.2 to +0.5) |
+| Held-out: P1 - P0+frozen SigLIP | +0.1 pts (-0.7 to +0.9) | +0.2 pts (-0.1 to +0.6) |
+
+**P1 passes the pre-registered rule.** The earlier "negative result" is withdrawn. What remains true: the gain from *fine-tuning* over frozen SigLIP features appears on validation (same layout families) but not on held-out families, so the generalizing part of P1's gain comes from adding SigLIP at all. Whether the product switches to P1 (which needs SigLIP and PyTorch at click time) is an open decision recorded in STATUS.md.
 
 ## Conformal abstention (split by page)
 
