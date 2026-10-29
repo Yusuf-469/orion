@@ -12,7 +12,9 @@ import time
 from typing import Any
 from urllib.parse import parse_qs, quote_plus, urlparse
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+import json
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from orion.tools.base import Idempotency, Permission, SideEffect, Tool, ToolContext, ToolSpec
 from orion.tools.errors import ErrorCode, ToolError
@@ -192,14 +194,28 @@ class ReadOut(BaseModel):
     evidence: str
 
 
+class ReadArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: str | None = Field(default=None, max_length=2000)
+
+
 class ReadTool(_WebTool):
-    spec = ToolSpec(id="web.read", version="1.0", description="Read the main text of the current page (longer).",
-                    input_model=NoArgs, output_model=ReadOut, permissions=frozenset({Permission.BROWSER_WEB}),
-                    side_effect=SideEffect.READ_ONLY, timeout_s=30, idempotency=Idempotency.IDEMPOTENT,
+    spec = ToolSpec(id="web.read", version="1.1",
+                    description="Read the main text of a page (longer than web.look). Give url to open it first; "
+                                "without url it reads the current page.",
+                    input_model=ReadArgs, output_model=ReadOut, permissions=frozenset({Permission.BROWSER_WEB}),
+                    side_effect=SideEffect.READ_ONLY, timeout_s=45, idempotency=Idempotency.IDEMPOTENT,
                     verification="text read from the live page", max_retries=1)
 
-    def run(self, args: NoArgs, ctx: ToolContext) -> ReadOut:
-        url, title, text = self.session.call(lambda p: (p.url, p.title(), self.session.text(p, READ_TEXT)))
+    def run(self, args: ReadArgs, ctx: ToolContext) -> ReadOut:
+        target = _check_url(args.url) if args.url else None
+
+        def go(p):
+            if target:
+                p.goto(target, wait_until="domcontentloaded", timeout=30_000)
+                _settle(p)
+            return p.url, p.title(), self.session.text(p, READ_TEXT)
+        url, title, text = self.session.call(go, timeout=40)
         return ReadOut(url=url, title=title, text=text,
                        evidence=f"read {len(text)} characters from '{title}' (untrusted page text)")
 
@@ -470,10 +486,29 @@ class QA(BaseModel):
     question: str = Field(min_length=1, max_length=400)
     answer: str | list[str] = Field(validation_alias=AliasChoices("answer", "answers", "value"))
 
+    @field_validator("answer", mode="before")
+    @classmethod
+    def _as_text(cls, v):   # a rating given as 4 instead of "4" means the same thing
+        if isinstance(v, (int, float, bool)):
+            return "yes" if v is True else "no" if v is False else str(v)
+        if isinstance(v, list):
+            return [str(x) for x in v]
+        return v
+
 
 class AnswerArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
     answers: list[QA] = Field(min_length=1, max_length=60)
+
+    @field_validator("answers", mode="before")
+    @classmethod
+    def _parse_text_list(cls, v):   # the list sent as a JSON string
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except ValueError:
+                raise ValueError("answers must be a list of {question, answer} objects, not text") from None
+        return v
 
 
 def _norm(s: str) -> str:

@@ -29,6 +29,7 @@ MAX_HISTORY = 14
 PAGE_MEMORY = 1_800      # characters kept per page read
 MAX_PAGES = 6
 REPEAT_LIMIT = 3
+MAX_SELF_CHECKS = 2       # after this the submit goes ahead to the user's confirmation as usual
 PAGE_CHANGERS = ("web.open", "web.click", "web.type", "web.choose", "web.fill", "web.submit")
 
 
@@ -169,8 +170,20 @@ class Agent:
             if hasattr(self.llm, "schema"):
                 self.llm.schema = old
 
+    def _self_check(self) -> list[str]:
+        from orion.agent.selfcheck import answer_key, compare, questions
+        qs = questions(self.last_elements)
+        if not qs:
+            return []
+        try:
+            return compare(qs, answer_key(self.llm, self.facts, qs))
+        except Exception:  # noqa: BLE001 - a failed check never blocks; the user still confirms
+            return []
+
     def _remember(self, tool: str, r: ToolResult) -> None:
         o = r.output or {}
+        if r.ok and tool == "web.look":
+            self.last_elements = o.get("elements", [])
         if r.ok and tool in ("web.open", "web.read", "web.look") and o.get("url"):
             self.pages[o["url"]] = (o.get("title", ""), (o.get("text") or "")[:PAGE_MEMORY])
             while len(self.pages) > MAX_PAGES:
@@ -213,7 +226,7 @@ class Agent:
             "4. Buttons marked SENDS can only be pressed with web.submit; the user will be asked to approve. "
             "For forms, answer every question in one web.answer call (question text -> answer; for 'choose "
             "all that apply' give the full list), check CURRENT PAGE, fix anything missing or wrong, then "
-            "web.submit.\n"
+            "web.submit. Do not use web.click to answer form questions.\n"
             "5. If an action failed, read why and try something different; do not repeat the same failing action.\n"
             "6. To read a search result, open its URL with web.open. Gather every fact you need before writing a "
             "document; put comparisons in a Markdown table (| a | b |).\n"
@@ -247,6 +260,8 @@ class Agent:
         steps: list[Step] = []
         fails: dict[str, int] = {}
         nudged = False
+        checks = 0
+        self.last_elements: list[dict[str, Any]] = []
         self.current = ""
         self.pages: dict[str, tuple[str, str]] = {}
         self.created: list[str] = []
@@ -266,13 +281,16 @@ class Agent:
             if tool == "ask_user":
                 q = str(args.get("question", "")).strip() or "Could you tell me more?"
                 answer = self.asker.ask(q, token) if self.asker else None
-                if answer is None and not nudged and self.facts:
-                    # Small models ask for details they were already given; point them back once.
+                if answer is None and not nudged:
+                    # Small models ask for details they already have, or for permission to continue; point
+                    # them back once before giving up.
                     nudged = True
                     steps.append(Step(n, thought, tool, args, False,
-                                      "No answer is available now. Everything the user has told ORION is under "
-                                      "WHAT THE USER HAS TOLD ORION: use it. Ask again only for something truly "
-                                      "missing there."))
+                                      "No answer is available now. "
+                                      + ("Everything the user has told ORION is under WHAT THE USER HAS TOLD "
+                                         "ORION: use it. " if self.facts else "")
+                                      + "Do not ask for permission: decide yourself from the goal and continue. "
+                                        "Ask again only for a fact about the user that you truly cannot know."))
                     continue
                 if answer is None:
                     return AgentResult("stopped", f"I needed an answer to continue: {q}", steps)
@@ -288,6 +306,25 @@ class Agent:
                        if f.validation_alias is not None for a in getattr(f.validation_alias, "choices", [])}
             dropped = sorted(set(args) - known - aliases)
             args = {k: v for k, v in args.items() if k not in dropped}
+            same = [s for s in steps[-REPEAT_LIMIT:] if s.tool == tool and s.args == args and s.ok]
+            if len(same) >= 2 and tool != "web.look":
+                # Doing the same successful thing again changes nothing; tell the model instead of acting.
+                steps.append(Step(n, thought, tool, args, False,
+                                  f"NOT REPEATED: you already did exactly this and it worked: "
+                                  f"{same[-1].observation[:200]}. Move on to the next part of the goal."))
+                if len([s for s in steps[-8:] if s.observation.startswith("NOT REPEATED")]) >= 4:
+                    return AgentResult("failed", "kept repeating the same action without progress", steps)
+                continue
+            if tool == "web.submit" and self.facts and self.last_elements and checks < MAX_SELF_CHECKS:
+                checks += 1
+                problems = self._self_check()
+                self.on_event({"kind": "agent_selfcheck", "n": n, "problems": problems})
+                if problems:
+                    steps.append(Step(n, thought, tool, args, False,
+                                      "NOT SENT. Self-check before sending found answers that disagree with what "
+                                      "the user told ORION:\n- " + "\n- ".join(problems) +
+                                      "\nFix them with web.answer, then web.submit again."))
+                    continue
             r = self.runtime.execute(ToolCall(tool_id=tool, args=args), token)
             obs = render_observation(tool, r)
             if dropped:
