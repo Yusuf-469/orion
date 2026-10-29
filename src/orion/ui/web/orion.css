@@ -197,3 +197,35 @@ body:not([data-state="idle"]) .core { transform: scale(.82); }
 .w-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
 .w-list { text-align: left; line-height: 1.7; color: #cdd5fb; padding-left: 20px; }
 .voices.mini { grid-template-columns: repeat(2, 1fr); text-align: left; margin-top: 14px; }
+
+/* ---- UI quality pass (ui-ux-pro-max guidelines: accessibility, touch, typography, motion) ---- */
+body { font-family: "DM Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 16px; }
+h1, h2, h3, .brand, .panel-h, .vn, .stop { font-family: "Space Grotesk", "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+h1 { font-weight: 600; letter-spacing: -.02em; }
+/* icons: one stroke style everywhere, never text symbols */
+.ico, .btn-ico, .chip-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+.chip-ico { width: 16px; height: 16px; color: var(--cyan); }
+.btn-ico { width: 18px; height: 18px; }
+#i-stop rect, .stop .btn-ico { fill: currentColor; }
+.play .btn-ico { fill: currentColor; stroke: none; margin-left: 2px; }
+.stop { display: inline-flex; align-items: center; gap: 8px; }
+.send { color: #fff; }
+.chip { display: inline-flex; align-items: center; gap: 8px; }
+/* visible keyboard focus on every control (important for people who do not use a mouse) */
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 10px; }
+.composer input:focus-visible { outline: none; }   /* the composer shows its own focus ring */
+/* touch targets of at least 44px */
+.nav { min-height: 44px; }
+.chip { min-height: 44px; padding: 0 16px; }
+.actions button, .primary, .ghost, .filters select { min-height: 44px; }
+/* readable placeholder and small text */
+.composer input::placeholder { color: #8a93c2; }
+.small { font-size: 13px; }
+/* staggered entrance: content arrives in order, not all at once */
+@keyframes enter { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.chips .chip, .voices .vcard, #history .hist { animation: enter .42s cubic-bezier(.2, .9, .3, 1.2) both; }
+.chips .chip:nth-child(2), .voices .vcard:nth-child(2), #history .hist:nth-child(2) { animation-delay: .06s; }
+.chips .chip:nth-child(3), .voices .vcard:nth-child(3), #history .hist:nth-child(3) { animation-delay: .12s; }
+.chips .chip:nth-child(4), .voices .vcard:nth-child(4), #history .hist:nth-child(4) { animation-delay: .18s; }
+.voices .vcard:nth-child(n+5) { animation-delay: .24s; }

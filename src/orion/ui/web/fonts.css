@@ -1,0 +1,3 @@
+/* Space Grotesk and DM Sans (SIL Open Font License 1.1), stored locally so ORION works offline. */
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap; src: url('fonts/SpaceGrotesk.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 100 1000; font-display: swap; src: url('fonts/DMSans.woff2') format('woff2'); }

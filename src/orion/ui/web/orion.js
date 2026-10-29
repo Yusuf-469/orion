@@ -192,7 +192,7 @@
     const list = voices.filter(v => (!fam || v.family === fam) && (!acc || v.accent === acc) && (!gen || v.gender === gen));
     $("#voices").innerHTML = list.length ? list.map(v => `
       <div class="vcard ${v.id === state.settings.voice_id ? "on" : ""}" data-id="${esc(v.id)}" title="Use this voice">
-        <button class="play" data-id="${esc(v.id)}" title="Preview">&#9654;</button>
+        <button class="play" data-id="${esc(v.id)}" title="Preview" aria-label="Preview this voice"><svg class="btn-ico" aria-hidden="true"><use href="#i-play"/></svg></button>
         <div><div class="vn">${esc(v.name)}</div><div class="vm">${esc([v.accent, v.gender].filter(Boolean).join(" · "))}</div></div>
         <span class="tag">${esc(v.family)}</span></div>`).join("") : `<p class="dim">No voices match.</p>`;
   };
@@ -230,7 +230,7 @@
     const pick = FEATURED.map(id => all.find(v => v.id === id)).filter(Boolean).slice(0, 4);
     $("#w-voices").innerHTML = pick.map(v => `
       <div class="vcard ${v.id === state.settings.voice_id ? "on" : ""}" data-id="${esc(v.id)}">
-        <button class="play" data-id="${esc(v.id)}">&#9654;</button>
+        <button class="play" data-id="${esc(v.id)}" aria-label="Preview this voice"><svg class="btn-ico" aria-hidden="true"><use href="#i-play"/></svg></button>
         <div><div class="vn">${esc(v.name)}</div><div class="vm">${esc([v.accent, v.gender].filter(Boolean).join(" · "))}</div></div></div>`).join("");
   };
   const step = n => document.querySelectorAll(".w-step").forEach(s => s.classList.toggle("on", Number(s.dataset.step) === n));
