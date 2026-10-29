@@ -125,6 +125,7 @@
     switch (e.kind) {
       case "task_start":
         $("#live").hidden = false; $("#plan").innerHTML = ""; $("#steps").innerHTML = ""; $("#result").hidden = true;
+        $("#liveview").hidden = true;
         $("#thought").textContent = ""; $("#task-title").textContent = e.goal.length > 80 ? e.goal.slice(0, 77) + "..." : e.goal;
         planDone = 0; t0 = Date.now(); clearInterval(timer);
         timer = setInterval(() => $("#task-time").textContent = Math.round((Date.now() - t0) / 1000) + " s", 500);
@@ -161,6 +162,9 @@
         setState(ok ? "success" : "error", ok ? "Done" : "Needs attention");
         setTimeout(() => { if (["success", "error"].includes(document.body.dataset.state)) setState("idle", "Ready"); }, 9000);
         break; }
+      case "live":
+        $("#liveview").hidden = false; $("#lv-img").src = "data:image/jpeg;base64," + e.jpeg;
+        $("#lv-title").textContent = e.title.length > 60 ? e.title.slice(0, 57) + "..." : e.title; break;
       case "hotkey": $("#hotkey-hint").textContent = e.ok ? "Ctrl+Alt+End stops everything" : "Hotkey unavailable: use STOP"; break;
       case "error": toast(e.message, true); break;
     }

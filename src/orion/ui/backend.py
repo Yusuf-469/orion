@@ -320,6 +320,13 @@ class Backend:
         finally:
             store.close()
 
+    def _live_view(self) -> None:
+        """Show what ORION's own browser shows (never the user's screen)."""
+        if self._session is not None and self.window is not None:
+            snap = self._session.peek()
+            if snap:
+                self.emit({"kind": "live", "url": snap[0], "title": snap[1], "jpeg": snap[2]})
+
     def _skill(self, goal: str, tool_id: str, rt, llm) -> tuple[str, str] | None:
         """Run a skill directly: one focused model call extracts its arguments from the goal, then the tool runs
         through the runtime (validation, policy, timeouts) like any other. None = fall back to the agent loop."""
@@ -340,7 +347,16 @@ class Backend:
             llm.schema = old
         args = {k: v for k, v in args.items() if k in spec.input_model.model_fields and v not in (None, "", [])}
         self.emit({"kind": "plan", "source": f"skill: {tool_id}", "plan": [f"{tool_id} {_short_args(args)}"]})
-        r = rt.execute(ToolCall(tool_id=tool_id, args=args), self.token)
+        stop_peek = threading.Event()
+
+        def peeker():   # a skill works for a while in the browser: refresh the live view every few seconds
+            while not stop_peek.wait(3):
+                self._live_view()
+        threading.Thread(target=peeker, name="orion-live", daemon=True).start()
+        try:
+            r = rt.execute(ToolCall(tool_id=tool_id, args=args), self.token)
+        finally:
+            stop_peek.set()
         self.emit({"kind": "step", "text": f"{tool_id}: {r.evidence}", "ok": r.ok})
         if r.error_code is not None and str(r.error_code) == "invalid_input" and "already exists" not in r.evidence:
             return None   # the extracted arguments did not fit; let the agent loop try
@@ -374,6 +390,8 @@ class Backend:
                            "args": _short_args(e.get("args", {}))})
             elif e["kind"] == "agent_result":
                 self.emit({"kind": "step", "text": f"{e['tool']}: {e['evidence']}", "ok": e["ok"]})
+                if e["tool"].startswith("web.") and e["tool"] not in ("web.search", "web.read_pages"):
+                    self._live_view()
             elif e["kind"] == "agent_selfcheck":
                 self.emit({"kind": "step", "ok": not e["problems"],
                            "text": "Self-check: " + ("all answers match what you told me" if not e["problems"]

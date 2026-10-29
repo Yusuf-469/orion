@@ -143,8 +143,12 @@ class WebSession:
         try:
             pw = sync_playwright().start()
             self.profile_dir.mkdir(parents=True, exist_ok=True)
-            ctx = pw.chromium.launch_persistent_context(str(self.profile_dir), headless=self.headless,
-                                                        viewport={"width": 1280, "height": 860})
+            # No casting / network discovery: ORION's browser never needs to accept incoming connections, and
+            # Chromium's Media Router made Windows Firewall ask to allow "Chrome for Testing" on the network.
+            ctx = pw.chromium.launch_persistent_context(
+                str(self.profile_dir), headless=self.headless, viewport={"width": 1280, "height": 860},
+                args=["--disable-features=MediaRouter,DialMediaRouteProvider,GlobalMediaControls",
+                      "--disable-background-networking"])
             self.page = ctx.pages[0] if ctx.pages else ctx.new_page()
             ready.set_result(True)
         except BaseException as e:  # noqa: BLE001
@@ -185,6 +189,20 @@ class WebSession:
             raise ToolError(ErrorCode.APPLICATION_UNAVAILABLE, f"browser error: {str(e).splitlines()[0]}") from None
         except TimeoutError:
             raise ToolError(ErrorCode.TIMEOUT, "the browser did not respond in time") from None
+
+    def peek(self) -> tuple[str, str, str] | None:
+        """(url, title, JPEG as base64) of ORION's own browser tab, for the live view. In memory only."""
+        if self._thread is None or not self._thread.is_alive():
+            return None
+
+        def shot(page):
+            import base64
+            data = page.screenshot(type="jpeg", quality=55, scale="css", timeout=5_000)
+            return page.url, page.title(), base64.b64encode(data).decode("ascii")
+        try:
+            return self.call(shot, timeout=8)
+        except Exception:  # noqa: BLE001 - the live view is optional
+            return None
 
     def close(self) -> None:
         if self._thread is not None and self._thread.is_alive():
