@@ -73,6 +73,50 @@ def markdown_to_docx(md: str, doc) -> tuple[int, int]:
     return heads, tables
 
 
+class ReadDocArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    path: str = Field(min_length=1, max_length=260, pattern=r"(?i)\.(docx|pdf|txt|md)$")
+
+
+class ReadDocOut(BaseModel):
+    path: str
+    text: str
+    untrusted: bool = True
+    evidence: str
+
+
+class ReadDocumentTool(Tool[ReadDocArgs, ReadDocOut]):
+    spec = ToolSpec(
+        id="docs.read_document", version="1.0",
+        description="Read the text of a document in the workspace (.docx, .pdf, .txt, .md), e.g. a CV.",
+        input_model=ReadDocArgs, output_model=ReadDocOut, permissions=frozenset({Permission.FILES_READ}),
+        side_effect=SideEffect.READ_ONLY, timeout_s=30, idempotency=Idempotency.IDEMPOTENT,
+        verification="text extracted from the file itself",
+    )
+
+    def run(self, args: ReadDocArgs, ctx: ToolContext) -> ReadDocOut:
+        p = resolve_in_workspace(ctx.workspace, args.path)
+        if not p.is_file():
+            raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no file {args.path!r} in the workspace")
+        ext = p.suffix.lower()
+        if ext == ".docx":
+            import docx
+            d = docx.Document(p)
+            parts = [x.text for x in d.paragraphs if x.text.strip()]
+            parts += [" | ".join(c.text for c in row.cells) for t in d.tables for row in t.rows]
+            text = "\n".join(parts)
+        elif ext == ".pdf":
+            from pypdf import PdfReader
+            text = "\n".join((pg.extract_text() or "") for pg in PdfReader(str(p)).pages[:30])
+        else:
+            text = p.read_text(encoding="utf-8-sig", errors="replace")
+        text = text.strip()[:20_000]
+        if not text:
+            raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"{args.path!r} has no readable text (a scanned image?)")
+        return ReadDocOut(path=rel_display(ctx.workspace, p), text=text,
+                          evidence=f"read {len(text)} characters from {rel_display(ctx.workspace, p)} (untrusted file text)")
+
+
 class WriteDocumentTool(Tool[DocArgs, DocOut]):
     spec = ToolSpec(
         id="docs.write_document", version="1.0",

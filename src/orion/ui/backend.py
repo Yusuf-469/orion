@@ -32,7 +32,9 @@ DESK_WORDS = re.compile(r"calculat|paint|\bapp\b|window|desktop|notepad|open (th
 def choose_tools(goal: str) -> list[str]:
     """Offer the model a focused tool set: small models choose much better from fewer tools (measured)."""
     from orion.tools.web import AGENT_TOOL_IDS
-    files = ["files.list", "files.read", "docs.write_document"]
+    files = ["files.list", "files.read", "docs.read_document", "docs.write_document"]
+    if re.search(r"\bjobs?\b|\bcv\b|resume|résumé|career|vacanc|opening", goal, re.I):
+        return ["jobs.shortlist", *AGENT_TOOL_IDS, *files]
     desk = ["calculator.compute", "app.launch", "desktop.look", "desktop.click", "desktop.type", "desktop.keys"]
     web, dsk = bool(WEB_WORDS.search(goal)), bool(DESK_WORDS.search(goal))
     if web and not dsk:
@@ -119,12 +121,16 @@ class Backend:
         from orion.policy import PolicyEngine
         from orion.tools.desktop import desktop_tools
         from orion.tools.web import WebSession, web_tools
-        from orion.tools.write_document import WriteDocumentTool
+        from orion.models.ollama import OllamaBackend
+        from orion.skills.jobs import JobShortlistTool
+        from orion.tools.write_document import ReadDocumentTool, WriteDocumentTool
         install_demo_pages(Path(self.cfg.workspace_dir))
         if self._session is None:
             self._session = WebSession(Path(self.cfg.data_dir) / "browser_profile", headless=False)
         reg = build_registry()
-        for t in [*web_tools(self._session), *desktop_tools(), WriteDocumentTool()]:
+        skill_llm = lambda: OllamaBackend(self.settings["model"], timeout_s=240, num_ctx=8192, num_predict=600)  # noqa: E731
+        for t in [*web_tools(self._session), *desktop_tools(), WriteDocumentTool(), ReadDocumentTool(),
+                  JobShortlistTool(self._session, skill_llm)]:
             if t.spec.id not in reg:
                 reg.register(t)
         perms = frozenset(self.cfg.granted_permissions)

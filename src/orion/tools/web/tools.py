@@ -220,6 +220,44 @@ class ReadTool(_WebTool):
                        evidence=f"read {len(text)} characters from '{title}' (untrusted page text)")
 
 
+class ReadPagesArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    urls: list[str] = Field(min_length=1, max_length=8)
+
+
+class PagesOut(BaseModel):
+    pages: list[dict[str, str]]
+    untrusted: bool = True
+    evidence: str
+
+
+class ReadPagesTool(_WebTool):
+    spec = ToolSpec(id="web.read_pages", version="1.0",
+                    description="Read several pages at once (up to 8 urls), e.g. every job or product found in a "
+                                "list. Returns each page's title and main text.",
+                    input_model=ReadPagesArgs, output_model=PagesOut, permissions=frozenset({Permission.BROWSER_WEB}),
+                    side_effect=SideEffect.READ_ONLY, timeout_s=120, idempotency=Idempotency.IDEMPOTENT,
+                    verification="text read from each live page", max_retries=0)
+
+    def run(self, args: ReadPagesArgs, ctx: ToolContext) -> PagesOut:
+        urls = [_check_url(u) for u in dict.fromkeys(args.urls)]
+
+        def go(page):
+            out = []
+            for u in urls:
+                if ctx.token.is_cancelled:
+                    break
+                try:
+                    page.goto(u, wait_until="domcontentloaded", timeout=25_000)
+                    _settle(page)
+                    out.append({"url": page.url, "title": page.title(), "text": self.session.text(page, 3_000)})
+                except Exception as e:  # noqa: BLE001 - one bad page does not lose the others
+                    out.append({"url": u, "title": "", "text": f"(could not open: {str(e).splitlines()[0]})"})
+            return out
+        pages = self.session.call(go, timeout=115)
+        return PagesOut(pages=pages, evidence=f"read {len(pages)} pages (untrusted page text)")
+
+
 # --- reversible: change the page, send nothing -----------------------------------------------
 
 class RefArgs(BaseModel):
@@ -256,8 +294,8 @@ class ClickTool(_WebTool):
         item = self.session.item(args.ref) or {}
         if item.get("role") in ("textbox", "select", "radio", "checkbox", "combobox", "switch"):
             raise ToolError(ErrorCode.INVALID_INPUT,
-                            f"{args.ref} ('{item.get('name', '')}') is a form field. Answer form questions with "
-                            f"web.answer (question -> answer), not by clicking")
+                            f"{args.ref} ('{item.get('name', '')}') is a form field; clicking it does nothing useful. "
+                            f"Only if the goal asks you to fill a form, answer it with web.answer")
 
     def run(self, args: RefArgs, ctx: ToolContext) -> ActOut:
         self.precheck(args)
@@ -658,9 +696,11 @@ class SubmitTool(_WebTool):
 
 # The tools offered to the agent. Fewer, higher-level tools work far better with small local models
 # (measured: with four overlapping form tools the model mixed them up). The low-level ones stay registered.
-AGENT_TOOL_IDS = ["web.search", "web.open", "web.look", "web.read", "web.click", "web.answer", "web.submit"]
+AGENT_TOOL_IDS = ["web.search", "web.open", "web.look", "web.read", "web.read_pages", "web.click", "web.answer",
+                  "web.submit"]
 
 
 def web_tools(session: WebSession, search_url: str = DEFAULT_SEARCH) -> list[Tool]:
     return [OpenTool(session), SearchTool(session, search_url), LookTool(session), ReadTool(session),
+            ReadPagesTool(session),
             ClickTool(session), TypeTool(session), ChooseTool(session), FillTool(session), AnswerTool(session), SubmitTool(session)]

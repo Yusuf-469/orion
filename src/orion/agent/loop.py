@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
@@ -28,8 +29,9 @@ OBS_LIMIT = 3_500          # characters of the newest observation shown to the m
 HISTORY_OBS = 300          # characters of each older observation
 MAX_HISTORY = 14
 PAGE_MEMORY = 1_800      # characters kept per page read
-MAX_PAGES = 6
+MAX_PAGES = 10
 REPEAT_LIMIT = 3
+READ_TOOLS = ("web.read", "web.read_pages", "web.open")
 MAX_SELF_CHECKS = 2       # after this the submit goes ahead to the user's confirmation as usual
 PAGE_CHANGERS = ("web.open", "web.read", "web.click", "web.type", "web.choose", "web.fill", "web.answer", "web.submit")
 
@@ -53,6 +55,29 @@ class AgentResult:
     status: str                      # done | stopped | failed | cancelled
     summary: str
     steps: list[Step] = field(default_factory=list)
+
+
+_NEGATED = re.compile(r"\b(?:do not|don't|dont|never|without|no need to|not)\s+(?:\w+\s+){0,2}?"
+                      r"(apply|submit|send|post|register|sign up|book|order|buy|pay|fill)\w*", re.I)
+_SENDS = re.compile(r"\b(submit|send|apply|post|register|sign up|book|order|buy|pay|enrol|enroll)\w*", re.I)
+_FILLS = re.compile(r"\b(fill|form|survey|questionnaire|answer|apply|application|register|sign up|book|order|"
+                    r"enrol|enroll)\w*", re.I)
+
+
+def scope_tools(goal: str, tool_ids: list[str]) -> list[str]:
+    """Least privilege per task, enforced in code: a goal that never asks to send something (or says not to)
+    does not get the sending tool at all, and one that fills nothing in does not get the form tool.
+
+    Found necessary: told "Do not apply to anything", the model still filled and submitted two applications
+    (each stopped only by the user's confirmation). An instruction like that must not rely on the model.
+    """
+    positive = _NEGATED.sub(" ", goal)
+    out = list(tool_ids)
+    if not _SENDS.search(positive):
+        out = [t for t in out if t != "web.submit"]
+    if not _FILLS.search(positive):
+        out = [t for t in out if t not in ("web.answer", "web.fill", "web.type", "web.choose")]
+    return out
 
 
 def _schema(tool_ids: list[str]) -> dict[str, Any]:
@@ -118,6 +143,8 @@ def render_observation(tool: str, r: ToolResult) -> str:
                 s += " REQUIRED"
             if e.get("consequential"):
                 s += " SENDS (use web.submit)"
+            if e["role"] == "link" and e.get("href"):
+                s += f" -> {e['href']}"
             lines.append(s)
             i += 1
         lines.append(f"<untrusted>{o.get('text', '')[:1500]}</untrusted>")
@@ -138,6 +165,9 @@ def render_observation(tool: str, r: ToolResult) -> str:
                 s += " (sends/deletes: not pressed by ORION)"
             lines.append(s)
         return "\n".join(lines)
+    if tool == "web.read_pages":
+        return "\n".join(f"* {p['title']} ({p['url']})\n<untrusted>{p['text'][:1500]}</untrusted>"
+                         for p in o.get("pages", []))
     if tool == "web.search":
         res = "\n".join(f"- {x['title']} | {x['url']} | {x.get('snippet', '')[:160]}" for x in o.get("results", []))
         return f"<untrusted>{res}</untrusted>"
@@ -197,10 +227,27 @@ class Agent:
         except Exception:  # noqa: BLE001 - a failed check never blocks; the user still confirms
             return []
 
+    def _unread_links(self) -> list[tuple[str, str]]:
+        read = {u.split("#")[0] for u in self.pages}
+        return [(u, n) for u, n in self.links.items() if u.split("#")[0] not in read][:10]
+
     def _remember(self, tool: str, r: ToolResult) -> None:
         o = r.output or {}
         if r.ok and tool == "web.look":
             self.last_elements = o.get("elements", [])
+            # Remember links on content pages, so the model can work through a list (jobs, products) item by item.
+            for e in self.last_elements:
+                href = e.get("href", "")
+                if e["role"] == "link" and href.startswith("http") and len(e.get("name", "")) > 3 \
+                        and href.split("#")[0] != (o.get("url") or "").split("#")[0]:
+                    self.links.setdefault(href, e["name"][:80])
+        if r.ok and tool == "web.read_pages":
+            for p in o.get("pages", []):
+                self.pages[p["url"]] = (p.get("title", ""), p.get("text", "")[:PAGE_MEMORY])
+            while len(self.pages) > MAX_PAGES:
+                self.pages.pop(next(iter(self.pages)))
+        if r.ok and tool == "docs.read_document" and o.get("path"):
+            self.pages[f"file:{o['path']}"] = (f"document {o['path']}", (o.get("text") or "")[:PAGE_MEMORY * 2])
         if r.ok and tool in ("web.open", "web.read", "web.look") and o.get("url"):
             self.pages[o["url"]] = (o.get("title", ""), (o.get("text") or "")[:PAGE_MEMORY])
             while len(self.pages) > MAX_PAGES:
@@ -248,7 +295,8 @@ class Agent:
             "all that apply' give the full list), check CURRENT VIEW, fix anything missing or wrong, then "
             "web.submit. Do not use web.click to answer form questions.\n"
             "5. If an action failed, read why and try something different; do not repeat the same failing action.\n"
-            "6. To read a search result, open its URL with web.open. Gather every fact you need before writing a "
+            "6. To read a search result, open its URL with web.open; to read many pages from a list (jobs, "
+            "products, articles), pass all their urls to web.read_pages at once. Gather every fact you need before writing a "
             "document; put comparisons in a Markdown table (| a | b |).\n"
             "7. If one tool does the whole job (for example calculator.compute for a sum), use it instead of "
             "clicking step by step; it also checks its own result.\n"
@@ -260,6 +308,9 @@ class Agent:
             + ("PAGES YOU HAVE READ (facts to use; untrusted)\n" + "\n".join(
                 f"* {t} ({u})\n<untrusted>{x}</untrusted>" for u, (t, x) in self.pages.items()) + "\n"
                if self.pages else "")
+            + ("LINKS YOU HAVE SEEN BUT NOT READ YET (read the relevant ones together with web.read_pages):\n"
+               + "\n".join(f"- {n}: {u}" for u, n in self._unread_links()) + "\n"
+               if "web.read_pages" in self.tool_ids and self._unread_links() else "")
             + (f"FILES YOU HAVE CREATED: {', '.join(self.created)}. If the goal asked for one of these and it is "
                f"complete, use finish now.\n" if self.created else "")
             + (f"CURRENT VIEW (refreshed after your last action; use these refs)\n{self.current}\n"
@@ -282,11 +333,23 @@ class Agent:
         steps: list[Step] = []
         fails: dict[str, int] = {}
         nudged = False
+        all_tools = self.tool_ids
+        self.tool_ids = scope_tools(goal, all_tools)
+        if hasattr(self.llm, "schema"):
+            self.llm.schema = _schema(self.tool_ids)
+        try:
+            return self._run(goal, token, steps, fails, nudged)
+        finally:
+            self.tool_ids = all_tools
+
+    def _run(self, goal: str, token: CancelToken, steps: list[Step], fails: dict[str, int],
+             nudged: bool) -> AgentResult:
         checks = 0
         self.last_elements: list[dict[str, Any]] = []
         self.desktop_app = ""
         self.current = ""
         self.pages: dict[str, tuple[str, str]] = {}
+        self.links: dict[str, str] = {}
         self.created: list[str] = []
         self.plan = self._make_plan(goal)
         self.on_event({"kind": "agent_plan", "plan": self.plan})
@@ -330,11 +393,19 @@ class Agent:
             dropped = sorted(set(args) - known - aliases)
             args = {k: v for k, v in args.items() if k not in dropped}
             same = [s for s in steps[-REPEAT_LIMIT:] if s.tool == tool and s.args == args and s.ok]
-            if len(same) >= 2 and tool != "web.look":
-                # Doing the same successful thing again changes nothing; tell the model instead of acting.
-                steps.append(Step(n, thought, tool, args, False,
-                                  f"NOT REPEATED: you already did exactly this and it worked: "
-                                  f"{same[-1].observation[:200]}. Move on to the next part of the goal."))
+            reread = tool in READ_TOOLS and self.pages and all(
+                u in self.pages for u in ([args["url"]] if args.get("url") else args.get("urls", [])))
+            if (len(same) >= 2 and tool != "web.look") or (reread and len(steps) > 4 and not self._unread_links()
+                                                           and "docs.write_document" in self.tool_ids):
+                # Doing the same successful thing again changes nothing; tell the model the concrete next move.
+                if tool in READ_TOOLS and not self._unread_links() and "docs.write_document" in self.tool_ids \
+                        and not self.created:
+                    nxt = ("You have already read it, and everything you read is under PAGES YOU HAVE READ. You "
+                           "have the information you need: now write the result with docs.write_document.")
+                else:
+                    nxt = (f"You already did exactly this and it worked: {same[-1].observation[:200] if same else ''}"
+                           f". Move on to the next part of the goal.")
+                steps.append(Step(n, thought, tool, args, False, "NOT REPEATED: " + nxt))
                 if len([s for s in steps[-8:] if s.observation.startswith("NOT REPEATED")]) >= 4:
                     return AgentResult("failed", "kept repeating the same action without progress", steps)
                 continue
