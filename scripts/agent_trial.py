@@ -88,6 +88,9 @@ def main() -> int:
         reg.register(t)
     from orion.skills.jobs import JobShortlistTool
     reg.register(JobShortlistTool(session, lambda: OllamaBackend(a.model, timeout_s=240, num_ctx=8192, num_predict=600)))
+    from orion.skills.compare import CompareTool
+    reg.register(CompareTool(session, lambda: OllamaBackend(a.model, timeout_s=300, num_ctx=16384, num_predict=1500),
+                             site + "/search.html?q={q}"))
     confirmer, asker = Yes(), NoAnswer()
     rt = ToolRuntime(reg, PolicyEngine(frozenset(Permission)), confirmer, tmp / "ws")
     (tmp / "ws").mkdir()
@@ -108,7 +111,8 @@ def main() -> int:
         cv.save(tmp / "ws" / "cv.docx")
     tools = (["calculator.compute", "app.launch", "desktop.look", "desktop.click", "desktop.type", "desktop.keys"] if a.task == "calc"
              else [*AGENT_TOOL_IDS, "docs.read_document", "docs.write_document"]
-             + (["jobs.shortlist"] if a.task == "jobs" else []))
+             + (["jobs.shortlist"] if a.task == "jobs" else [])
+             + (["research.compare"] if a.task == "compare" else []))
     agent = Agent(rt, llm, tools, asker=asker, max_steps=30,
                   on_event=lambda e: (events.append(e), print(f"  {e.get('n')}: {e['kind']} {e.get('tool')} "
                                                                f"{json.dumps(e.get('args', e.get('evidence', '')))[:150]}",
