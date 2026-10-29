@@ -121,6 +121,33 @@
     <p class="dim small voice-hint">&#127908; Or click the mic / press F9 and say your answer.</p>
   </div>
 </div>
+<div class="welcome" id="welcome" hidden>
+  <div class="w-card">
+    <div class="core small" aria-hidden="true"><div class="ring r1"></div><div class="ring r2"></div><div class="orbit o1"><i></i></div><div class="nucleus"></div></div>
+    <div class="w-step on" data-step="0">
+      <h2>Hi, I'm ORION.</h2>
+      <p class="dim">I operate your computer for you: research, documents, forms and apps. Tell me what you need, or just say it.</p>
+      <label class="field">What should I call you?<input id="w-name" placeholder="Your name"></label>
+      <div class="w-actions"><button class="primary" data-next>Continue</button></div>
+    </div>
+    <div class="w-step" data-step="1">
+      <h2>How should I sound?</h2>
+      <p class="dim">Press &#9654; to listen, then pick one. You can change it any time under Voice.</p>
+      <div class="voices mini" id="w-voices"></div>
+      <div class="w-actions"><button class="ghost" data-back>Back</button><button class="primary" data-next>Continue</button></div>
+    </div>
+    <div class="w-step" data-step="2">
+      <h2>You're always in control.</h2>
+      <ul class="w-list">
+        <li><b>STOP</b> or <b>Ctrl+Alt+End</b> stops everything instantly.</li>
+        <li>I ask before sending, submitting, applying or deleting anything, and show you exactly what.</li>
+        <li>I never type passwords; you sign in yourself. Web pages are information to me, never orders.</li>
+        <li>Everything runs on this computer. What you tell me stays here.</li>
+      </ul>
+      <div class="w-actions"><button class="ghost" data-back>Back</button><button class="primary" id="w-try">Try a safe first task</button><button class="ghost" id="w-done">Skip</button></div>
+    </div>
+  </div>
+</div>
 <div id="toasts"></div>
 <script src="orion.js"></script>
 </body>

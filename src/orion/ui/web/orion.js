@@ -220,7 +220,40 @@
   $("#s-ask").onchange = e => api().set_setting("ask_every_change", e.target.checked);
   $("#s-model").onchange = e => api().set_setting("model", e.target.value.trim());
   $("#s-workspace").onclick = () => api().open_workspace();
-  addEventListener("pywebviewready", loadState);
+  // ---- first launch --------------------------------------------------------------------
+  const FEATURED = ["kokoro:af_heart", "kokoro:bm_george", "kokoro:hf_alpha", "kokoro:am_michael",
+                    "win:Microsoft Zira Desktop - English (United States)", "win:Microsoft David Desktop - English (United States)"];
+  const welcome = async () => {
+    if (!state.settings || state.settings.onboarded) return;
+    $("#welcome").hidden = false; $("#w-name").value = state.profile.name || ""; $("#w-name").focus();
+    const all = await api().list_voices();
+    const pick = FEATURED.map(id => all.find(v => v.id === id)).filter(Boolean).slice(0, 4);
+    $("#w-voices").innerHTML = pick.map(v => `
+      <div class="vcard ${v.id === state.settings.voice_id ? "on" : ""}" data-id="${esc(v.id)}">
+        <button class="play" data-id="${esc(v.id)}">&#9654;</button>
+        <div><div class="vn">${esc(v.name)}</div><div class="vm">${esc([v.accent, v.gender].filter(Boolean).join(" · "))}</div></div></div>`).join("");
+  };
+  const step = n => document.querySelectorAll(".w-step").forEach(s => s.classList.toggle("on", Number(s.dataset.step) === n));
+  let wstep = 0;
+  $("#welcome").addEventListener("click", async e => {
+    if (e.target.closest("[data-next]")) {
+      if (wstep === 0 && $("#w-name").value.trim()) await api().save_profile($("#w-name").value, state.profile.facts || "");
+      step(++wstep);
+    } else if (e.target.closest("[data-back]")) step(--wstep);
+    const play = e.target.closest(".play"), card = e.target.closest(".vcard");
+    if (play) { e.stopPropagation(); api().preview_voice(play.dataset.id, 1.0); }
+    else if (card) {
+      state.settings = await api().set_setting("voice_id", card.dataset.id);
+      document.querySelectorAll("#w-voices .vcard").forEach(c => c.classList.toggle("on", c === card));
+      api().preview_voice(card.dataset.id, 1.0);
+    }
+  });
+  const finishWelcome = async () => { state.settings = await api().set_setting("onboarded", true); $("#welcome").hidden = true; loadState(); };
+  $("#w-done").onclick = finishWelcome;
+  $("#w-try").onclick = async () => { await finishWelcome(); run("Work out 15% of 2400 in Calculator and tell me the answer."); };
+  $("#w-name").addEventListener("keydown", e => { if (e.key === "Enter") document.querySelector('.w-step.on [data-next]').click(); });
+
+  addEventListener("pywebviewready", async () => { await loadState(); welcome(); });
   if (api()) loadState();
   greet();
 })();

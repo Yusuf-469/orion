@@ -70,7 +70,7 @@ class Backend:
         self.history_path = Path(cfg.data_dir) / "agent_history.jsonl"
         self.settings_path = Path(cfg.data_dir) / "ui_settings.json"
         self.settings = {"voice": True, "ask_every_change": cfg.confirm_reversible, "model": llm_model,
-                         "voice_id": "kokoro:af_heart", "voice_rate": 1.0}
+                         "voice_id": "kokoro:af_heart", "voice_rate": 1.0, "onboarded": False}
         try:
             saved = json.loads(self.settings_path.read_text(encoding="utf-8"))
             self.settings.update({k: v for k, v in saved.items() if k in self.settings})
