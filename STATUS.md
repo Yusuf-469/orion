@@ -90,6 +90,11 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Hands-free answers (yes/no, option names, spoken answers) | verified (rules, node test) | `tests/ui/voice_answer.test.mjs`; with a real voice: untested |
 | Desktop tools (look/click/type/keys in allowed apps) | implemented-real | Calculator via generic tools 2/5 -> routed to the verified tool 5/5; generic tools kept for other allowed apps |
 | **ORION interface** (pywebview + WebView2): command center, live plan/steps, approvals, questions, memory, activity, voice, settings; global kill switch | verified (real window, screenshots) | form task run in the real window: approval dialog listed every answer, submitted after approval, Done in 42 s; `tests/unit/test_ui_backend.py` 9 passed |
+| **Real web (read-only + test form)** | verified (real sites, 2026-10-29) | comparison via DuckDuckGo: Sony/Bose official pages + SoundGuys + Amazon, 2/2 runs, 34-38 s, correct file name; price claims checked against the table in code. httpbin.org test form: filled correctly, self-check passed, submit declined -> nothing sent. Not tried: sites needing login, Google Forms (needs an account) |
+| Skills run directly (one argument-extraction call) | verified | comparison and jobs goals; jobs 3/3 via the backend, all 6 adverts rated |
+| Live view of ORION's browser in the interface | verified (backend frames) | 7 frames during a form task; in memory only |
+| First-launch welcome (name, voice, safety, first task) | verified (screenshot) | |
+| Notepad save without keyboard focus (File > Save via UIA) | verified (real, with another window in front) | real suite 25/31 while a Windows Firewall prompt held focus (was 22); the other 6 are correct refusals ("another window covers") or focus-dependent test setup |
 | Release with the new interface | verified (built app) | zip 286 MB, self-test 6/6; packaged app: Calculator goal done (360, 21 s), comparison goal wrote comparison.docx (36 s) |
 
 ## Test totals (2026-10-24, end of session)
