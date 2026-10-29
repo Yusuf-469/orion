@@ -32,7 +32,8 @@ class CompareArgs(BaseModel):
     items: list[str] = Field(min_length=2, max_length=5)
     urls: list[str] = Field(default_factory=list, max_length=10)     # optional: pages to use (product pages, reviews)
     search_url: str | None = Field(default=None, max_length=2000)    # optional: a site search, e.g. ".../search?q={q}"
-    out_path: str = Field(default="comparison.docx", max_length=260, pattern=r"(?i)\.(docx|md)$")
+    out_path: str = Field(default="comparison.docx", max_length=260, pattern=r"(?i)\.(docx|md)$",
+                          description="the file name the user asked for")
 
 
 class CompareOut(BaseModel):
@@ -45,7 +46,8 @@ class CompareTool(Tool[CompareArgs, CompareOut]):
     spec = ToolSpec(
         id="research.compare", version="1.0",
         description="Compare 2-5 products or options: finds and reads their pages (or the urls/search page you "
-                    "give), then writes a document with a spec table, pros and cons of each, and who each suits.",
+                    "give), then writes a document with a spec table, pros and cons of each, and who each suits. "
+                    "Set out_path to the file name the user asked for.",
         input_model=CompareArgs, output_model=CompareOut,
         permissions=frozenset({Permission.BROWSER_WEB, Permission.FILES_WRITE}),
         side_effect=SideEffect.REVERSIBLE, timeout_s=600, idempotency=Idempotency.NON_IDEMPOTENT,
@@ -62,13 +64,23 @@ class CompareTool(Tool[CompareArgs, CompareOut]):
         hrefs = page.evaluate("() => [...document.querySelectorAll('.result a, .search-result a, h2 a, h3 a')]"
                               ".map(a => [a.href, a.innerText])")
         words = [w for w in item.lower().split() if len(w) > 1]
-        out = []
+        search_host = urlparse(search).netloc
+        out, hosts = [], set()
         for h, text in hrefs:
             q = parse_qs(urlparse(h).query)
             h = q["uddg"][0] if "uddg" in q else h
-            if h.startswith("http") and sum(w in text.lower() for w in words) >= max(1, len(words) - 1):
+            host = urlparse(h).netloc
+            # Never the search engine's own pages; at most one page per website, so the facts come from
+            # independent sources (e.g. the maker's page and a review).
+            if (not h.startswith("http") or host == search_host or host in hosts
+                    or any(s in host for s in ("duckduckgo.", "bing.", "google.", "yahoo."))):
+                continue
+            if sum(w in text.lower() for w in words) >= max(1, len(words) - 1):
                 out.append(h)
-        return out[:2]
+                hosts.add(host)
+            if len(out) == 2:
+                break
+        return out
 
     def run(self, args: CompareArgs, ctx: ToolContext) -> CompareOut:
         from orion.tools.web.tools import _check_url, _settle
