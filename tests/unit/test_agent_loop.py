@@ -155,3 +155,15 @@ def test_a_declined_approval_ends_the_task_without_asking_again():
     llm = Script(step("t.send", text="x"), step("ask_user", question="Submit anyway?"))
     res = agent(llm).run("send x", CancelToken())
     assert res.status == "stopped" and "you chose not to approve it" in res.summary and len(res.steps) == 1
+
+
+def test_job_gates_only_fail_on_the_adverts_own_words():
+    from orion.skills.jobs import gate_failures, ground_gates
+    advert = "Python, PyTorch. Applicants must be U.S. citizens and able to obtain a Secret security clearance."
+    r = {"eligibility": {"verdict": "FAIL", "quote": "Applicants must be U.S. citizens"},
+         "language": {"verdict": "FAIL", "quote": "Work rights: Indian citizen; no US work permit"},   # profile, not advert
+         "location_fit": {"verdict": "FAIL", "quote": "Location: Pune"}}
+    ground_gates(r, advert)
+    assert r["eligibility"]["verdict"] == "FAIL"
+    assert r["language"]["verdict"] == "UNVERIFIED" and r["location_fit"]["verdict"] == "FLAG"
+    assert gate_failures(r) == ['work eligibility: "Applicants must be U.S. citizens"']

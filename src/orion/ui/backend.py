@@ -346,6 +346,11 @@ class Backend:
         finally:
             llm.schema = old
         args = {k: v for k, v in args.items() if k in spec.input_model.model_fields and v not in (None, "", [])}
+        if "profile" in spec.input_model.model_fields:
+            # The user's own details come from Memory, never from the model.
+            prof = self._profile()
+            args["profile"] = "\n".join(x for x in (f"Name: {prof.get('name', '')}" if prof.get("name") else "",
+                                                     prof.get("facts", "")) if x)[:8000]
         self.emit({"kind": "plan", "source": f"skill: {tool_id}", "plan": [f"{tool_id} {_short_args(args)}"]})
         stop_peek = threading.Event()
 
