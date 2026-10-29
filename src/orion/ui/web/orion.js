@@ -152,7 +152,8 @@
     if (!api()) return;
     state = await api().get_state(); greet();
     $("#m-name").value = state.profile.name || ""; $("#m-facts").value = state.profile.facts || "";
-    $("#s-voice").checked = state.settings.voice; $("#s-ask").checked = state.settings.ask_every_change;
+    $("#v-on").checked = state.settings.voice; $("#s-ask").checked = state.settings.ask_every_change;
+    $("#v-rate").value = state.settings.voice_rate; $("#v-rate-val").textContent = Number(state.settings.voice_rate).toFixed(2) + "×";
     $("#s-model").value = state.settings.model;
     $("#history").innerHTML = state.history.length ? state.history.map(h =>
       `<div class="hist"><div><span class="g">${esc(h.goal)}</span><span class="badge ${esc(h.status)}">${esc(h.status)}</span>
@@ -160,7 +161,38 @@
       : `<p class="dim">Nothing yet. Ask ORION to do something on the Home screen.</p>`;
   };
   $("#m-save").onclick = async () => { await api().save_profile($("#m-name").value, $("#m-facts").value); $("#m-saved").textContent = "Saved"; loadState(); setTimeout(() => $("#m-saved").textContent = "", 2500); };
-  $("#s-voice").onchange = e => api().set_setting("voice", e.target.checked);
+  // ---- voice picker --------------------------------------------------------------------
+  let voices = [];
+  const renderVoices = () => {
+    const fam = $("#v-family").value, acc = $("#v-accent").value, gen = $("#v-gender").value;
+    const list = voices.filter(v => (!fam || v.family === fam) && (!acc || v.accent === acc) && (!gen || v.gender === gen));
+    $("#voices").innerHTML = list.length ? list.map(v => `
+      <div class="vcard ${v.id === state.settings.voice_id ? "on" : ""}" data-id="${esc(v.id)}" title="Use this voice">
+        <button class="play" data-id="${esc(v.id)}" title="Preview">&#9654;</button>
+        <div><div class="vn">${esc(v.name)}</div><div class="vm">${esc([v.accent, v.gender].filter(Boolean).join(" · "))}</div></div>
+        <span class="tag">${esc(v.family)}</span></div>`).join("") : `<p class="dim">No voices match.</p>`;
+  };
+  const loadVoices = async () => {
+    if (voices.length || !api()) return renderVoices();
+    voices = await api().list_voices();
+    const accents = [...new Set(voices.map(v => v.accent).filter(Boolean))];
+    $("#v-accent").innerHTML = `<option value="">Any accent</option>` + accents.map(a => `<option>${esc(a)}</option>`).join("");
+    renderVoices();
+  };
+  $("#voices").addEventListener("click", async e => {
+    const play = e.target.closest(".play"), card = e.target.closest(".vcard");
+    if (play) { e.stopPropagation(); api().preview_voice(play.dataset.id, Number($("#v-rate").value)); return; }
+    if (card) {
+      state.settings = await api().set_setting("voice_id", card.dataset.id);
+      renderVoices(); api().preview_voice(card.dataset.id, Number($("#v-rate").value));
+      toast("Voice set to " + card.querySelector(".vn").textContent);
+    }
+  });
+  ["#v-family", "#v-accent", "#v-gender"].forEach(s => $(s).onchange = renderVoices);
+  $("#v-rate").oninput = e => $("#v-rate-val").textContent = Number(e.target.value).toFixed(2) + "×";
+  $("#v-rate").onchange = async e => { state.settings = await api().set_setting("voice_rate", Number(e.target.value)); };
+  $("#v-on").onchange = e => api().set_setting("voice", e.target.checked);
+  document.querySelector('.nav[data-view="voice"]').addEventListener("click", loadVoices);
   $("#s-ask").onchange = e => api().set_setting("ask_every_change", e.target.checked);
   $("#s-model").onchange = e => api().set_setting("model", e.target.value.trim());
   $("#s-workspace").onclick = () => api().open_workspace();

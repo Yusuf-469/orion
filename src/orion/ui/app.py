@@ -33,6 +33,12 @@ class Api:
     def set_setting(self, key, value):
         return self._b.set_setting(key, value)
 
+    def list_voices(self):
+        return self._b.list_voices()
+
+    def preview_voice(self, voice_id, rate=1.0):
+        return self._b.preview_voice(voice_id, rate)
+
     def mic_start(self):
         return self._b.mic_start()
 

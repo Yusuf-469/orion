@@ -163,3 +163,21 @@ body:not([data-state="idle"]) .core { transform: scale(.82); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (max-width: 1100px) { .live { grid-template-columns: 1fr; } }
 .live[hidden] { display: none; }
+/* voice picker */
+.voice-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; }
+.speed { display: flex; align-items: center; gap: 12px; color: var(--dim); }
+.speed input { accent-color: var(--cyan); width: 180px; } .speed b { color: var(--text); font-weight: 600; min-width: 42px; }
+.filters { display: flex; gap: 10px; margin: 6px 0 16px; }
+.filters select { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10, 16, 42, .8); color: var(--text); font: inherit; }
+.voices { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.vcard { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; border: 1px solid var(--line);
+         background: var(--panel); backdrop-filter: blur(10px); transition: .2s; cursor: pointer; }
+.vcard:hover { border-color: rgba(95, 212, 255, .45); transform: translateY(-1px); }
+.vcard.on { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 26px rgba(95, 212, 255, .25);
+            background: linear-gradient(135deg, rgba(77, 124, 255, .22), rgba(14, 22, 52, .6)); }
+.vcard .play { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(77, 124, 255, .18);
+               color: var(--cyan); font-size: 14px; display: grid; place-items: center; }
+.vcard .play:hover { background: var(--blue); color: #fff; box-shadow: 0 0 16px var(--blue); }
+.vcard .vn { font-weight: 600; } .vcard .vm { font-size: 12px; color: var(--dim); }
+.vcard .tag { position: absolute; top: 10px; right: 12px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--cyan); opacity: .8; }
+.vcard.on .tag::after { content: " \2713"; }

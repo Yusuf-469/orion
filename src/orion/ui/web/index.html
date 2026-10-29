@@ -15,6 +15,7 @@
     <button class="nav on" data-view="home"><span class="ico">&#9673;</span>Home</button>
     <button class="nav" data-view="activity"><span class="ico">&#9776;</span>Activity</button>
     <button class="nav" data-view="memory"><span class="ico">&#10022;</span>Memory</button>
+    <button class="nav" data-view="voice"><span class="ico">&#9835;</span>Voice</button>
     <button class="nav" data-view="settings"><span class="ico">&#9881;</span>Settings</button>
   </nav>
   <div class="me"><div class="avatar" id="avatar">?</div><div><div id="me-name">Set your name</div><div class="dim small">Local &middot; private</div></div></div>
@@ -82,9 +83,23 @@
     <button class="primary" id="m-save">Save</button> <span class="dim small" id="m-saved"></span>
   </section>
 
+  <section class="view" id="view-voice">
+    <h2>Voice</h2>
+    <p class="dim">Choose how ORION sounds. Press &#9654; to hear a voice. Natural voices are generated on this computer; nothing is sent anywhere.</p>
+    <div class="voice-bar">
+      <label class="toggle"><input type="checkbox" id="v-on"><span></span>Speak to me</label>
+      <label class="speed">Speed <input type="range" id="v-rate" min="0.6" max="1.6" step="0.05"><b id="v-rate-val">1.0&times;</b></label>
+    </div>
+    <div class="filters" id="v-filters">
+      <select id="v-family"><option value="">All voices</option><option>Natural</option><option>Windows</option></select>
+      <select id="v-accent"><option value="">Any accent</option></select>
+      <select id="v-gender"><option value="">Any</option><option>Female</option><option>Male</option></select>
+    </div>
+    <div class="voices" id="voices"><p class="dim">Loading voices...</p></div>
+  </section>
+
   <section class="view" id="view-settings">
     <h2>Settings</h2>
-    <label class="toggle"><input type="checkbox" id="s-voice"><span></span>Speak to me (questions, approvals and results)</label>
     <label class="toggle"><input type="checkbox" id="s-ask"><span></span>Ask me before every change, not only before sending or deleting</label>
     <label class="field">Local AI model (Ollama)<input id="s-model"></label>
     <p class="dim small">ORION never sends, submits, buys or deletes without your approval, never types passwords, and treats web pages as information, not instructions.</p>

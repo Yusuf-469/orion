@@ -58,7 +58,14 @@ class Backend:
         self.token: CancelToken | None = None
         self.profile_path = Path(cfg.data_dir) / "profile.json"
         self.history_path = Path(cfg.data_dir) / "agent_history.jsonl"
-        self.settings = {"voice": True, "ask_every_change": cfg.confirm_reversible, "model": llm_model}
+        self.settings_path = Path(cfg.data_dir) / "ui_settings.json"
+        self.settings = {"voice": True, "ask_every_change": cfg.confirm_reversible, "model": llm_model,
+                         "voice_id": "kokoro:af_heart", "voice_rate": 1.0}
+        try:
+            saved = json.loads(self.settings_path.read_text(encoding="utf-8"))
+            self.settings.update({k: v for k, v in saved.items() if k in self.settings})
+        except (OSError, ValueError):
+            pass
         self._speaker = None
         self._recorder = None
         self._transcriber = None
@@ -75,15 +82,34 @@ class Backend:
             except Exception:  # noqa: BLE001 - the window may be closing
                 pass
 
+    def _voice(self):
+        if self._speaker is None:
+            from orion.voice import Speaker
+            self._speaker = Speaker(self.settings["voice_id"], self.settings["voice_rate"])
+        self._speaker.configure(self.settings["voice_id"], self.settings["voice_rate"])
+        return self._speaker
+
     def say(self, text: str) -> None:
         if self.settings["voice"] and text:
             try:
-                if self._speaker is None:
-                    from orion.voice import Speaker
-                    self._speaker = Speaker()
-                self._speaker.say(text)
+                self._voice().say(text)
             except Exception:  # noqa: BLE001 - no audio device: stay silent
                 pass
+
+    def list_voices(self) -> list[dict[str, str]]:
+        from orion.voice.speak import list_voices
+        return list_voices()
+
+    def preview_voice(self, voice_id: str, rate: float = 1.0) -> bool:
+        """Say a short sample in the chosen voice (works even while voice output is switched off)."""
+        try:
+            sp = self._voice()
+            sp.configure(voice_id, rate)
+            name = self._profile().get("name", "").split(" ")[0]
+            sp.say(f"Hi{' ' + name if name else ''}, I'm ORION. This is how I will sound when I talk to you.")
+            return True
+        except Exception:  # noqa: BLE001
+            return False
 
     def _build(self):
         if self._runtime is not None and self._runtime.policy.confirm_reversible == self.settings["ask_every_change"]:
@@ -161,6 +187,9 @@ class Backend:
     def set_setting(self, key: str, value: Any) -> dict[str, Any]:
         if key in self.settings:
             self.settings[key] = value
+            self.settings_path.write_text(json.dumps(self.settings), encoding="utf-8")
+            if key in ("voice_id", "voice_rate") and self._speaker is not None:
+                self._speaker.configure(self.settings["voice_id"], self.settings["voice_rate"])
         return self.settings
 
     def answer(self, wid: str, value: Any) -> bool:
