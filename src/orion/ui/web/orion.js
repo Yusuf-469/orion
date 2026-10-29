@@ -75,12 +75,32 @@
     } else {
       listening = false; $("#mic").classList.remove("on"); setState("thinking", "Understanding...");
       const text = await api().mic_stop();
-      if (modal.wid && modal.kind === "ask") { $("#modal-text").value = text; return; }
+      if (modal.wid) { voiceAnswer(text); return; }
       if (text) { $("#goal").value = text; run(text); } else { setState("idle", "Ready"); toast("I didn't catch that. Try again."); }
     }
   };
   $("#mic").onclick = toggleMic;
   addEventListener("keydown", e => { if (e.key === "F9") { e.preventDefault(); toggleMic(); } });
+
+  // Spoken answers to an open dialog, so ORION can be used without a mouse.
+  const voiceAnswer = text => {
+    const t = (text || "").toLowerCase().trim();
+    if (!t) { toast("I didn't catch that. Click the mic and try again."); return; }
+    if (modal.kind === "ask") { answer(text); return; }
+    if (modal.kind === "confirm") {
+      if (/\b(no|nope|don't|do not|cancel|stop|deny|reject|wait)\b/.test(t)) return answer(false);
+      if (/\b(yes|yeah|yep|approve|approved|go ahead|do it|confirm|sure|okay|ok|send it|submit)\b/.test(t)) return answer(true);
+      toast(`Heard "${text}". Say "yes" to approve or "no" to cancel.`); return;
+    }
+    if (modal.kind === "choose") {
+      if (/\b(neither|none|cancel|no)\b/.test(t)) return answer(null);
+      const opts = [...$("#modal-actions").children].slice(1).map(b => b.textContent.toLowerCase());
+      const ord = ["first", "second", "third", "fourth"].findIndex(w => t.includes(w));
+      let i = ord >= 0 && ord < opts.length ? ord : opts.findIndex(o => o.split(/\W+/).some(w => w.length > 3 && t.includes(w)));
+      if (i >= 0) return answer(i);
+      toast(`Heard "${text}". Say an option, "the first one", or "neither".`);
+    }
+  };
 
   // ---- dialogs: approvals, questions, choices ------------------------------------------
   const modal = {wid: null, kind: null};

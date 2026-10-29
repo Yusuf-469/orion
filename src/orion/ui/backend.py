@@ -158,7 +158,9 @@ class Backend:
         return w.value
 
     def confirm(self, req: ConfirmationRequest, token: CancelToken) -> bool:
-        self.say("Before I do this, please check and approve.")
+        # Read the request aloud too, for people who cannot easily read or use the mouse.
+        details = req.consequence.split("What is filled in:")[-1].replace("->", ",").replace("\n", ". ")[:600]
+        self.say(f"{req.action} {details}. Say yes to approve, or no to cancel.")
         return bool(self._wait("confirm", {"action": req.action, "consequence": req.consequence,
                                            "tool": req.tool_id, "side_effect": str(req.side_effect)}, token))
 
