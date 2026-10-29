@@ -149,3 +149,9 @@ def test_compare_drops_price_claims_that_contradict_the_table():
     removed = CompareTool.check_price_claims(["Sony", "Bose"], d)
     assert sorted(removed) == ["Cheaper than Sony", "More expensive than Bose"]
     assert d["items"][0]["cons"] == ["No IP rating"] and d["items"][1]["cons"] == ["More expensive"]
+
+
+def test_a_declined_approval_ends_the_task_without_asking_again():
+    llm = Script(step("t.send", text="x"), step("ask_user", question="Submit anyway?"))
+    res = agent(llm).run("send x", CancelToken())
+    assert res.status == "stopped" and "you chose not to approve it" in res.summary and len(res.steps) == 1

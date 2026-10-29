@@ -452,6 +452,10 @@ class Agent:
             self.on_event({"kind": "agent_result", "n": n, "tool": tool, "ok": r.ok, "evidence": r.evidence[:300]})
             if r.error_code is ErrorCode.CANCELLED:
                 return AgentResult("cancelled", "stopped by the user", steps)
+            if r.error_code is ErrorCode.CONFIRMATION_REQUIRED:
+                # The user said no: respect it and stop, instead of asking again in other words.
+                return AgentResult("stopped", self._verified_summary(
+                    "Not done: you chose not to approve it. Nothing was sent.", steps), steps)
             if not r.ok:
                 key = tool + json.dumps(args, sort_keys=True)
                 fails[key] = fails.get(key, 0) + 1
