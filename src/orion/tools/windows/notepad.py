@@ -142,6 +142,30 @@ def read_tab_text(name: str) -> str | None:
         return _norm_text(_document(auto, win).GetTextPattern().DocumentRange.GetText(-1))
 
 
+def _save_via_menu(auto, win) -> bool:
+    """File > Save through UI Automation: works without keyboard focus, so another window (or the user typing
+    elsewhere) cannot swallow or redirect a Ctrl+S. Only presses a Save item owned by the same Notepad process."""
+    try:
+        menu = win.MenuItemControl(searchDepth=8, AutomationId="File")
+        if not menu.Exists(1):
+            return False
+        menu.GetExpandCollapsePattern().Expand()
+        time.sleep(0.5)
+        pid = win.ProcessId
+        for root in [win, *auto.GetRootControl().GetChildren()]:
+            if root.ProcessId != pid:
+                continue
+            for c, _ in auto.WalkControl(root, maxDepth=10):
+                if c.ControlTypeName == "MenuItemControl" and c.Name.split("\t")[0].strip() == "Save" \
+                        and c.ProcessId == pid and c.GetPattern(auto.PatternId.InvokePattern):
+                    c.GetInvokePattern().Invoke()
+                    return True
+        menu.GetExpandCollapsePattern().Collapse()
+    except Exception:  # noqa: BLE001 - fall back to the keyboard shortcut
+        pass
+    return False
+
+
 def _require_windows():
     if sys.platform != "win32":
         raise ToolError(ErrorCode.UNSUPPORTED_CAPABILITY, "Notepad tools are Windows-only")
@@ -269,7 +293,8 @@ class SetTextTool(Tool[SetTextArgs, Out]):
             # Save: re-check that our tab is still active, then Ctrl+S to the document control only.
             if find_our_window(auto, p.name) is None:
                 raise ToolError(ErrorCode.STALE_STATE, "active tab changed before saving; not saved")
-            doc.SendKeys("{Ctrl}s", waitTime=0.2)
+            if not _save_via_menu(auto, win):
+                doc.SendKeys("{Ctrl}s", waitTime=0.2)   # fallback; needs Notepad to keep keyboard focus
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 if _norm_text(p.read_text(encoding="utf-8-sig", errors="replace")) == want:
