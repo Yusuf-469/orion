@@ -38,6 +38,10 @@ def choose_tools(goal: str) -> list[str]:
     if re.search(r"\bcompar|\bvs\.?\b|versus|which (is|one) (is )?better|pros and cons", goal, re.I):
         return ["research.compare", *AGENT_TOOL_IDS, *files]
     desk = ["calculator.compute", "app.launch", "desktop.look", "desktop.click", "desktop.type", "desktop.keys"]
+    if re.search(r"calculat|\bsum\b|percent|%|\bwork out\b", goal, re.I) and not WEB_WORDS.search(goal):
+        # A verified tool exists: offer it alone. With generic clicking also on offer the model sometimes
+        # pressed "=" repeatedly in the real Calculator (seen in the packaged app: 2400*0.15 -> 360 -> 54).
+        return ["calculator.compute", *files]
     web, dsk = bool(WEB_WORDS.search(goal)), bool(DESK_WORDS.search(goal))
     if web and not dsk:
         return [*AGENT_TOOL_IDS, *files]
