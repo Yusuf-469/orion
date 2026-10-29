@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
@@ -121,6 +122,22 @@ def render_observation(tool: str, r: ToolResult) -> str:
             i += 1
         lines.append(f"<untrusted>{o.get('text', '')[:1500]}</untrusted>")
         return "\n".join(lines)
+    if tool == "desktop.look":
+        lines = [f"app window: {o.get('title')}", "controls:"]
+        for e in o.get("elements", []):
+            s = f"[{e['ref']}] {e['role']} '{e.get('name', '')}'"
+            if e.get("id"):
+                s += f" (id {e['id']})"
+            if "value" in e:
+                s += f" value='{str(e['value'])[:80]}'"
+            if "checked" in e:
+                s += " checked" if e["checked"] else " unchecked"
+            if e.get("disabled"):
+                s += " (disabled)"
+            if e.get("consequential"):
+                s += " (sends/deletes: not pressed by ORION)"
+            lines.append(s)
+        return "\n".join(lines)
     if tool == "web.search":
         res = "\n".join(f"- {x['title']} | {x['url']} | {x.get('snippet', '')[:160]}" for x in o.get("results", []))
         return f"<untrusted>{res}</untrusted>"
@@ -225,12 +242,14 @@ class Agent:
             "own work: decide and keep going.\n"
             "4. Buttons marked SENDS can only be pressed with web.submit; the user will be asked to approve. "
             "For forms, answer every question in one web.answer call (question text -> answer; for 'choose "
-            "all that apply' give the full list), check CURRENT PAGE, fix anything missing or wrong, then "
+            "all that apply' give the full list), check CURRENT VIEW, fix anything missing or wrong, then "
             "web.submit. Do not use web.click to answer form questions.\n"
             "5. If an action failed, read why and try something different; do not repeat the same failing action.\n"
             "6. To read a search result, open its URL with web.open. Gather every fact you need before writing a "
             "document; put comparisons in a Markdown table (| a | b |).\n"
-            "7. When the goal is done, or impossible, use finish and say exactly what was and was not done.\n"
+            "7. If one tool does the whole job (for example calculator.compute for a sum), use it instead of "
+            "clicking step by step; it also checks its own result.\n"
+            "8. When the goal is done, or impossible, use finish and say exactly what was and was not done.\n"
             f"TOOLS\n{self._tools_text()}\n"
             + (f"WHAT THE USER HAS TOLD ORION (already confirmed by the user: use it directly, never ask to confirm it)\n{self.facts}\n" if self.facts else "")
             + f"GOAL\n{goal}\n"
@@ -240,7 +259,7 @@ class Agent:
                if self.pages else "")
             + (f"FILES YOU HAVE CREATED: {', '.join(self.created)}. If the goal asked for one of these and it is "
                f"complete, use finish now.\n" if self.created else "")
-            + (f"CURRENT PAGE (refreshed after your last action; use these refs)\n{self.current}\n"
+            + (f"CURRENT VIEW (refreshed after your last action; use these refs)\n{self.current}\n"
                if self.current else "")
             + (f"WARNING: you used {steps[-1].tool} {REPEAT_LIMIT} times in a row. Stop repeating: check the goal "
                f"and either do the next part or finish.\n" if self._repeating(steps) else "")
@@ -262,6 +281,7 @@ class Agent:
         nudged = False
         checks = 0
         self.last_elements: list[dict[str, Any]] = []
+        self.desktop_app = ""
         self.current = ""
         self.pages: dict[str, tuple[str, str]] = {}
         self.created: list[str] = []
@@ -330,7 +350,21 @@ class Agent:
             if dropped:
                 obs = f"(ignored arguments this tool does not have: {', '.join(dropped)})\n" + obs
             self._remember(tool, r)
-            if tool == "web.look" and r.ok:
+            if tool == "desktop.look" and r.ok:
+                self.desktop_app = args.get("app", "")
+                self.current = obs
+            elif r.ok and tool in ("desktop.click", "desktop.type", "desktop.keys") and self.desktop_app:
+                lr = self.runtime.execute(ToolCall(tool_id="desktop.look", args={"app": self.desktop_app}), token)
+                if lr.ok:
+                    self.current = render_observation("desktop.look", lr)
+            elif r.ok and tool == "app.launch" and "desktop.look" in self.tool_ids:
+                app = {"calculator": "calculator", "paint": "paint"}.get(args.get("app", ""))
+                if app:
+                    time.sleep(1.5)   # let the new window draw its controls
+                    lr = self.runtime.execute(ToolCall(tool_id="desktop.look", args={"app": app}), token)
+                    if lr.ok:
+                        self.desktop_app, self.current = app, render_observation("desktop.look", lr)
+            elif tool == "web.look" and r.ok:
                 self.current = obs
             elif r.ok and tool in PAGE_CHANGERS and "web.look" in self.tool_ids:
                 # Re-read the page after every change so the model always sees the real, current state.
