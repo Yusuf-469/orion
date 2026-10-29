@@ -27,7 +27,9 @@ DEFAULT_VOICE = "kokoro:af_heart"
 
 
 def kokoro_available() -> bool:
-    return (KOKORO_DIR / KOKORO_MODEL).exists() and (KOKORO_DIR / KOKORO_VOICES).exists()
+    import importlib.util
+    return ((KOKORO_DIR / KOKORO_MODEL).exists() and (KOKORO_DIR / KOKORO_VOICES).exists()
+            and importlib.util.find_spec("kokoro_onnx") is not None)
 
 
 def list_voices() -> list[dict[str, str]]:

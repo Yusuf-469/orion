@@ -55,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--selftest", nargs="?", const="selftest.json", metavar="FILE")
     parser.add_argument("--install-browser", action="store_true")
     parser.add_argument("--run-helper", metavar="NAME")
+    parser.add_argument("--classic", action="store_true", help="the original tool-console window")
+    parser.add_argument("--model", default="qwen2.5:7b", help="local AI model for the agent (Ollama)")
     args, rest = parser.parse_known_args(argv)
 
     from orion import resources
@@ -76,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.selftest:
         from orion.app.selftest import run_selftest
         return run_selftest(Path(args.selftest))
+    if not args.classic:
+        from orion.ui.app import main as ui_main
+        return ui_main((["--config", str(args.config)] if args.config else []) + ["--model", args.model])
 
     cfg = load_config(args.config)
     from orion.observability import setup_logging
