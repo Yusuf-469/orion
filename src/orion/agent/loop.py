@@ -31,7 +31,7 @@ PAGE_MEMORY = 1_800      # characters kept per page read
 MAX_PAGES = 6
 REPEAT_LIMIT = 3
 MAX_SELF_CHECKS = 2       # after this the submit goes ahead to the user's confirmation as usual
-PAGE_CHANGERS = ("web.open", "web.click", "web.type", "web.choose", "web.fill", "web.submit")
+PAGE_CHANGERS = ("web.open", "web.read", "web.click", "web.type", "web.choose", "web.fill", "web.answer", "web.submit")
 
 
 class Asker(Protocol):
