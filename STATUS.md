@@ -1,7 +1,7 @@
 # ORION STATUS
 
 Statuses: planned / in progress / implemented-mock / implemented-real / verified.
-Last updated: 2026-10-24 (Stage 1 complete, awaiting gate approval).
+Last updated: 2026-10-29 (product phase: agent, real-web tools, voice, new interface).
 
 ## Environment (VERIFIED 2026-10-24, raw output kept locally, not published; regenerate with `scripts/env_audit.ps1`)
 Win 11 Home 10.0.26200 · i7-13650HX · 23.8 GB RAM · RTX 4060 Laptop 8 GB (~6 GB free at idle), driver 610.88 · 68 GB free disk · displays 1920×1080 @125% and @100%.
@@ -81,11 +81,24 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | **Portable release build (Stage 9b)** | verified (built app) | `packaging/build.ps1`: zip 220 MB; built app self-test 6/6 with no Python on PATH; packaged GUI driven end to end (canvas click VERIFIED_COMPLETE). Clean Windows profile (new standard user, 2026-10-28): self-test 6/6 after `--install-browser` (26 s download), GUI canvas click VERIFIED_COMPLETE (`artifacts/acceptance_clean_profile.json`). Not done: second machine, code signing. `docs/RELEASE_CHECKLIST.md` |
 | User guide, claims audit | done | `docs/USER_GUIDE.md`; README and example config corrected (example config was silently dropping 2 permissions) |
 | GPU stack | installed (approved) | torch 2.11.0+cu128 on RTX 4060, transformers 5.21, peft 0.21, scikit-learn 1.9.1, SigLIP base (Apache-2.0) |
+| **Agent loop (open-ended goals)** with local Qwen2.5-7B (Apache-2.0, verified) | verified (real, test site) | `src/orion/agent/`: plan, page memory, live view, verified summary, repeat interception, per-task tool scoping in code, self-check before sending. `research/agent_eval/README.md`: compare 5/5, form 5/5, calc 5/5, jobs 5/5 (2026-10-29) |
+| **Real-web tools** (search, open, read, read_pages, look, click, answer forms, submit) in ORION's own browser profile | verified (real, local test site) | `tests/integration/test_web_tools.py` 6 passed: every form widget incl. ARIA (Google-Forms-like), submit only after a yes and only on real send buttons, incomplete forms refused, passwords never typed, invisible text stripped. Real websites: permitted, **not tested** by ORION (tests use local pages only) |
+| Skills: `research.compare`, `jobs.shortlist` | verified (real, test site) | compare: full spec table + pros/cons + verdict + sources from 3 pages; jobs: ranked shortlist, top 2 correct in 5/5, never applies |
+| Documents: write .docx/.md, read .docx/.pdf/.txt | verified (unit + trials) | python-docx (MIT), pypdf (BSD) |
+| **Voice**: push-to-talk speech recognition (faster-whisper small.en, MIT, GPU), spoken replies | verified (round trip) | `tests/integration/test_voice.py` 4 passed (Windows speech -> Whisper; 0.1-0.3 s per sentence on GPU). Live microphone: **untested by me** (needs a person speaking) |
+| Voice picker: 44 voices (Kokoro natural voices incl. Hindi/British, Windows voices), preview, speed | verified (backend) | previews play; choice saved. Kokoro pack is optional and not bundled (espeak-ng GPL) |
+| Hands-free answers (yes/no, option names, spoken answers) | verified (rules, node test) | `tests/ui/voice_answer.test.mjs`; with a real voice: untested |
+| Desktop tools (look/click/type/keys in allowed apps) | implemented-real | Calculator via generic tools 2/5 -> routed to the verified tool 5/5; generic tools kept for other allowed apps |
+| **ORION interface** (pywebview + WebView2): command center, live plan/steps, approvals, questions, memory, activity, voice, settings; global kill switch | verified (real window, screenshots) | form task run in the real window: approval dialog listed every answer, submitted after approval, Done in 42 s; `tests/unit/test_ui_backend.py` 9 passed |
+| Release with the new interface | verified (built app) | zip 286 MB, self-test 6/6; packaged app: Calculator goal done (360, 21 s), comparison goal wrote comparison.docx (36 s) |
 
 ## Test totals (2026-10-24, end of session)
 `-m "not real"` offscreen: **204 passed** (2026-10-27). `-m real`: **2 passed** (hotkey message handling, Calculator launch). Crash tests run real subprocesses.
 
-## RESUME HERE (Stage 6 core done)
+## RESUME HERE (2026-10-29: product phase)
+ORION is now an open-ended agent with a voice and a new interface (rows above). Next candidates: try it on real websites with the author watching (it has only been measured on local test pages), more allowed desktop apps (File Explorer, Settings pages) with safety review, job applications with per-application approval, packaging the natural-voice pack as an optional download, an installer and code signing. GitHub: backup branch `orion-v2`; `main` on GitHub still has the pre-cleanup history until the author force-pushes.
+
+## Earlier resume note (Stage 6 core done)
 2026-10-28: learned grounding scorer live (90% correct on unseen layouts, fewer wrong clicks than rules); conformal analysis; frozen and fine-tuned SigLIP measured (P1 passes the pre-registered rule after a 2026-10-29 correction; author kept P0 in the product, documented deviation); "did you mean A or B?" live. Real-app grounding measured; benchmark v1 done (Stage 9a); portable release built and verified (Stage 9b, gate C pending). Latest totals: `-m "not real"` 253 passed, `-m real` 20 passed + 1 skipped (hotkey held by a running ORION). Clean-profile install verified. Gate C open items: licence notices in the zip, final report and slides, two demo rehearsals + fallback recording (author). Follow-up: let task outcomes use tools' own checks (Calculator, form fill) instead of "unverified". Open: human-eye checks M7/M9.
 
 ## Open issues
