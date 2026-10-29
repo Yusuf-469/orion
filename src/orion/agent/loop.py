@@ -252,7 +252,8 @@ class Agent:
             self.pages[o["url"]] = (o.get("title", ""), (o.get("text") or "")[:PAGE_MEMORY])
             while len(self.pages) > MAX_PAGES:
                 self.pages.pop(next(iter(self.pages)))
-        if r.ok and o.get("path") and tool in ("docs.write_document", "files.write_new", "docs.write_csv"):
+        if r.ok and o.get("path") and tool in ("docs.write_document", "files.write_new", "docs.write_csv",
+                                               "research.compare", "jobs.shortlist", "docs.summarize_csv"):
             self.created.append(o["path"])
 
     def _verified_summary(self, said: str, steps: list[Step]) -> str:

@@ -130,3 +130,12 @@ def test_tools_are_scoped_to_what_the_goal_asks(goal, has_submit, has_answer):
     from orion.agent.loop import scope_tools
     got = scope_tools(goal, ["web.open", "web.answer", "web.submit"])
     assert ("web.submit" in got) is has_submit and ("web.answer" in got) is has_answer and "web.open" in got
+
+
+def test_files_made_by_skills_are_reported_as_verified():
+    from orion.agent.loop import Agent
+    from orion.execution.runtime import ToolResult
+    a = agent(Script())
+    a.pages, a.links, a.created, a.last_elements = {}, {}, [], []
+    a._remember("research.compare", ToolResult("research.compare", True, {"path": "comparison.docx"}))
+    assert a._verified_summary("done", []) == "done\n[Verified by ORION: created comparison.docx]"
