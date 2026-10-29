@@ -212,8 +212,11 @@ class Agent:
         """The model's own summary can be wrong; add what ORION's tools actually verified."""
         done = [f"created {p}" for p in self.created]
         done += [s.observation.split("\n")[0] for s in steps if s.tool == "web.submit" and s.ok]
-        sent_refused = sum(1 for s in steps if s.tool == "web.submit" and not s.ok)
+        held = sum(1 for s in steps if s.tool == "web.submit" and s.observation.startswith("NOT SENT. Self-check"))
+        sent_refused = sum(1 for s in steps if s.tool == "web.submit" and not s.ok) - held
         facts = "; ".join(done) if done else "nothing was created or sent"
+        if held:
+            facts += f"; the self-check stopped {held} send(s) until wrong answers were fixed"
         if sent_refused:
             facts += f"; {sent_refused} send(s) not done (not approved or failed)"
         return f"{said}\n[Verified by ORION: {facts}]"

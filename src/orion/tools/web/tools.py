@@ -251,8 +251,16 @@ class ClickTool(_WebTool):
                     side_effect=SideEffect.REVERSIBLE, timeout_s=30, idempotency=Idempotency.NON_IDEMPOTENT,
                     verification="the page after the click (URL, title) is reported")
 
-    def run(self, args: RefArgs, ctx: ToolContext) -> ActOut:
+    def precheck(self, args: RefArgs) -> None:
         _refuse_if_sends(self.session, args.ref, "web.click")
+        item = self.session.item(args.ref) or {}
+        if item.get("role") in ("textbox", "select", "radio", "checkbox", "combobox", "switch"):
+            raise ToolError(ErrorCode.INVALID_INPUT,
+                            f"{args.ref} ('{item.get('name', '')}') is a form field. Answer form questions with "
+                            f"web.answer (question -> answer), not by clicking")
+
+    def run(self, args: RefArgs, ctx: ToolContext) -> ActOut:
+        self.precheck(args)
 
         def go(page):
             before = page.url

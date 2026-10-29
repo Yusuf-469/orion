@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORION</title>
+<link rel="stylesheet" href="orion.css">
+</head>
+<body data-state="idle">
+<canvas id="stars" aria-hidden="true"></canvas>
+
+<aside class="side">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span>ORION</span></div>
+  <nav>
+    <button class="nav on" data-view="home"><span class="ico">&#9673;</span>Home</button>
+    <button class="nav" data-view="activity"><span class="ico">&#9776;</span>Activity</button>
+    <button class="nav" data-view="memory"><span class="ico">&#10022;</span>Memory</button>
+    <button class="nav" data-view="settings"><span class="ico">&#9881;</span>Settings</button>
+  </nav>
+  <div class="me"><div class="avatar" id="avatar">?</div><div><div id="me-name">Set your name</div><div class="dim small">Local &middot; private</div></div></div>
+</aside>
+
+<main>
+  <header class="top">
+    <div class="status"><span class="dot"></span><span id="status-text">Ready</span></div>
+    <div class="top-right">
+      <span class="dim small" id="hotkey-hint"></span>
+      <button class="stop" id="stop" title="Stop everything now">&#9632; STOP</button>
+    </div>
+  </header>
+
+  <section class="view on" id="view-home">
+    <div class="hero">
+      <div class="core" id="core" aria-hidden="true">
+        <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+        <div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div>
+        <div class="nucleus"></div>
+      </div>
+      <h1 id="greeting">Good evening</h1>
+      <p class="dim" id="subline">What would you like to get done?</p>
+      <form class="composer" id="composer" autocomplete="off">
+        <input id="goal" placeholder="Tell ORION what you need, e.g. &quot;Compare two headphones and write me a document&quot;" aria-label="Your goal">
+        <button type="button" class="mic" id="mic" title="Talk to ORION (click to start, click to send) - F9" aria-label="Talk">
+          <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>
+        </button>
+        <button type="submit" class="send" aria-label="Run">&#10148;</button>
+      </form>
+      <div class="chips">
+        <button class="chip" data-goal="Compare the Aurora X1 and Nimbus Pro headphones from the ORION test shop (search it at http://127.0.0.1:8765/search.html?q=aurora+nimbus) and write a Word document named comparison.docx with a spec table and the pros and cons of each.">&#9878; Compare products</button>
+        <button class="chip" data-goal="Fill in the feedback form at http://127.0.0.1:8765/form/feedback.html with my details and answers, then submit it.">&#9998; Fill a form</button>
+        <button class="chip" data-goal="Work out 15% of 2400 in Calculator and tell me the answer.">&#8721; Calculate</button>
+        <button class="chip" data-goal="save the table from sales.html as report.csv then summarize report.csv into summary.txt then open summary.txt in notepad">&#9636; Table to report</button>
+      </div>
+    </div>
+
+    <div class="live" id="live" hidden>
+      <div class="panel plan-panel">
+        <div class="panel-h"><span>Plan</span><span class="dim small" id="plan-src"></span></div>
+        <ol id="plan"></ol>
+      </div>
+      <div class="panel steps-panel">
+        <div class="panel-h"><span id="task-title">Working</span><span class="dim small" id="task-time"></span></div>
+        <div id="thought" class="thought"></div>
+        <ul id="steps"></ul>
+        <div id="result" class="result" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-activity">
+    <h2>Activity</h2>
+    <p class="dim">Everything ORION has done on this computer. Files it makes live in its workspace folder.</p>
+    <div id="history"></div>
+  </section>
+
+  <section class="view" id="view-memory">
+    <h2>Memory</h2>
+    <p class="dim">What you tell ORION here is used to fill forms and answer questions for you. It stays on this computer.</p>
+    <label class="field">Your name<input id="m-name" placeholder="e.g. Asha Rao"></label>
+    <label class="field">About you (details for forms, preferences, a short CV)
+      <textarea id="m-facts" rows="12" placeholder="Email: ...&#10;Phone: ...&#10;City: ...&#10;Skills: ...&#10;Uses the library app weekly ..."></textarea></label>
+    <button class="primary" id="m-save">Save</button> <span class="dim small" id="m-saved"></span>
+  </section>
+
+  <section class="view" id="view-settings">
+    <h2>Settings</h2>
+    <label class="toggle"><input type="checkbox" id="s-voice"><span></span>Speak to me (questions, approvals and results)</label>
+    <label class="toggle"><input type="checkbox" id="s-ask"><span></span>Ask me before every change, not only before sending or deleting</label>
+    <label class="field">Local AI model (Ollama)<input id="s-model"></label>
+    <p class="dim small">ORION never sends, submits, buys or deletes without your approval, never types passwords, and treats web pages as information, not instructions.</p>
+    <button class="ghost" id="s-workspace">Open the workspace folder</button>
+  </section>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="card-glow"></div>
+    <h3 id="modal-title"></h3>
+    <pre id="modal-body"></pre>
+    <div id="modal-input" hidden><input id="modal-text" placeholder="Type your answer"></div>
+    <div class="actions" id="modal-actions"></div>
+  </div>
+</div>
+<div id="toasts"></div>
+<script src="orion.js"></script>
+</body>
+</html>

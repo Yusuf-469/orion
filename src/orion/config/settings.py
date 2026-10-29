@@ -18,7 +18,8 @@ DEFAULT_CONFIG_NAME = "orion.toml"
 
 # Least privilege: deleting is not granted unless the user adds it in orion.toml.
 DEFAULT_PERMISSIONS = (Permission.FILES_READ, Permission.FILES_WRITE, Permission.APP_LAUNCH,
-                       Permission.APP_CONTROL, Permission.BROWSER_READ)
+                       Permission.APP_CONTROL, Permission.BROWSER_READ, Permission.BROWSER_WEB)
+# browser.web: real websites in ORION's own browser; sending/submitting there always asks first.
 
 
 class OrionConfig(BaseModel):
