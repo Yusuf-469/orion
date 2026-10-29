@@ -33,10 +33,12 @@ def choose_tools(goal: str) -> list[str]:
     """Offer the model a focused tool set: small models choose much better from fewer tools (measured)."""
     from orion.tools.web import AGENT_TOOL_IDS
     files = ["files.list", "files.read", "docs.read_document", "docs.write_document"]
+    # When a skill does the whole job, offer it alone (plus reading files): with the free web tools also on
+    # offer, the model sometimes browsed by itself for 40 steps instead (seen on the real web).
     if re.search(r"\bjobs?\b|\bcv\b|resume|résumé|career|vacanc|opening", goal, re.I):
-        return ["jobs.shortlist", *AGENT_TOOL_IDS, *files]
+        return ["jobs.shortlist", "files.list", "docs.read_document"]
     if re.search(r"\bcompar|\bvs\.?\b|versus|which (is|one) (is )?better|pros and cons", goal, re.I):
-        return ["research.compare", *AGENT_TOOL_IDS, *files]
+        return ["research.compare", "files.list", "docs.read_document"]
     desk = ["calculator.compute", "app.launch", "desktop.look", "desktop.click", "desktop.type", "desktop.keys"]
     if re.search(r"calculat|\bsum\b|percent|%|\bwork out\b", goal, re.I) and not WEB_WORDS.search(goal):
         # A verified tool exists: offer it alone. With generic clicking also on offer the model sometimes
@@ -318,6 +320,35 @@ class Backend:
         finally:
             store.close()
 
+    def _skill(self, goal: str, tool_id: str, rt, llm) -> tuple[str, str] | None:
+        """Run a skill directly: one focused model call extracts its arguments from the goal, then the tool runs
+        through the runtime (validation, policy, timeouts) like any other. None = fall back to the agent loop."""
+        from orion.execution.runtime import ToolCall
+        spec = rt.registry.get(tool_id).spec
+        schema = spec.input_model.model_json_schema()
+        prompt = (f"Extract the arguments for the tool '{tool_id}' ({spec.description}) from the user's request. "
+                  f"Use only what the request says; leave optional fields out if it does not say. File names must be "
+                  f"exactly as written. JSON matching this schema: {json.dumps(schema)}\nREQUEST: {goal}\nJSON only.")
+        old = llm.schema
+        try:
+            llm.schema = {k: v for k, v in schema.items() if k != "title"}
+            raw = llm(prompt)
+            args = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
+        except Exception:  # noqa: BLE001
+            return None
+        finally:
+            llm.schema = old
+        args = {k: v for k, v in args.items() if k in spec.input_model.model_fields and v not in (None, "", [])}
+        self.emit({"kind": "plan", "source": f"skill: {tool_id}", "plan": [f"{tool_id} {_short_args(args)}"]})
+        r = rt.execute(ToolCall(tool_id=tool_id, args=args), self.token)
+        self.emit({"kind": "step", "text": f"{tool_id}: {r.evidence}", "ok": r.ok})
+        if r.error_code is not None and str(r.error_code) == "invalid_input" and "already exists" not in r.evidence:
+            return None   # the extracted arguments did not fit; let the agent loop try
+        if not r.ok:
+            return "failed", r.evidence
+        path = (r.output or {}).get("path")
+        return "done", f"{r.evidence}\n[Verified by ORION: created {path}]" if path else r.evidence
+
     def _agent(self, goal: str, rt) -> tuple[str, str]:
         from orion.agent import Agent
         from orion.models.ollama import OllamaBackend
@@ -330,6 +361,10 @@ class Backend:
         prof = self._profile()
         facts = "\n".join(x for x in (f"Name: {prof['name']}" if prof.get("name") else "", prof.get("facts", "")) if x)
         tools = choose_tools(goal)
+        if tools[0] in ("research.compare", "jobs.shortlist"):
+            done = self._skill(goal, tools[0], rt, llm)
+            if done is not None:
+                return done
 
         def on_event(e):
             if e["kind"] == "agent_plan":

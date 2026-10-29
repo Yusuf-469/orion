@@ -139,3 +139,13 @@ def test_files_made_by_skills_are_reported_as_verified():
     a.pages, a.links, a.created, a.last_elements = {}, {}, [], []
     a._remember("research.compare", ToolResult("research.compare", True, {"path": "comparison.docx"}))
     assert a._verified_summary("done", []) == "done\n[Verified by ORION: created comparison.docx]"
+
+
+def test_compare_drops_price_claims_that_contradict_the_table():
+    from orion.skills.compare import CompareTool
+    d = {"rows": [{"spec": "Price", "values": ["$228.00", "$449.00"]}],
+         "items": [{"name": "Sony", "pros": ["Great ANC"], "cons": ["More expensive than Bose", "No IP rating"]},
+                   {"name": "Bose", "pros": ["Cheaper than Sony", "Comfort"], "cons": ["More expensive"]}]}
+    removed = CompareTool.check_price_claims(["Sony", "Bose"], d)
+    assert sorted(removed) == ["Cheaper than Sony", "More expensive than Bose"]
+    assert d["items"][0]["cons"] == ["No IP rating"] and d["items"][1]["cons"] == ["More expensive"]
