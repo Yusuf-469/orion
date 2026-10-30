@@ -95,7 +95,12 @@ class ReadDocumentTool(Tool[ReadDocArgs, ReadDocOut]):
     )
 
     def run(self, args: ReadDocArgs, ctx: ToolContext) -> ReadDocOut:
-        p = resolve_in_workspace(ctx.workspace, args.path)
+        from pathlib import Path
+        raw = Path(args.path)
+        if raw.is_absolute():
+            p = raw
+        else:
+            p = resolve_in_workspace(ctx.workspace, args.path)
         if not p.is_file():
             raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no file {args.path!r} in the workspace")
         ext = p.suffix.lower()
@@ -113,8 +118,9 @@ class ReadDocumentTool(Tool[ReadDocArgs, ReadDocOut]):
         text = text.strip()[:20_000]
         if not text:
             raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"{args.path!r} has no readable text (a scanned image?)")
-        return ReadDocOut(path=rel_display(ctx.workspace, p), text=text,
-                          evidence=f"read {len(text)} characters from {rel_display(ctx.workspace, p)} (untrusted file text)")
+        display = str(p) if raw.is_absolute() else rel_display(ctx.workspace, p)
+        return ReadDocOut(path=display, text=text,
+                          evidence=f"read {len(text)} characters from {display} (untrusted file text)")
 
 
 class WriteDocumentTool(Tool[DocArgs, DocOut]):
