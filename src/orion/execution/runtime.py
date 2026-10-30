@@ -75,8 +75,19 @@ class ToolRuntime:
             return f"would fail: {e.code}: {e.message}"
         except ValidationError as e:
             return f"would fail: {ErrorCode.INVALID_INPUT}: {_summarize(e)}"
-        d = self.policy.decide(tool.spec)
+        d = self._decide(tool, tool.spec.input_model.model_validate(call.args))
         return f"would {d.decision} ({d.reason})"
+
+    def _decide(self, tool, args: BaseModel):
+        """Policy on the registered spec, raised (never lowered) by the call's own target."""
+        decision = self.policy.decide(tool.spec)
+        escalation = getattr(tool, "escalation", None)
+        if escalation is not None and decision.decision is not Decision.DENY:
+            try:
+                decision = self.policy.escalate(decision, escalation(args, self.workspace))
+            except ToolError:
+                pass   # a bad path is reported by precheck / run, before anything is touched
+        return decision
 
     def execute(self, call: ToolCall, token: CancelToken) -> ToolResult:
         start = time.monotonic()
@@ -102,7 +113,7 @@ class ToolRuntime:
         except ValidationError as e:
             return _fail(tid, ErrorCode.INVALID_INPUT, _summarize(e))
 
-        decision = self.policy.decide(spec)
+        decision = self._decide(tool, args)
         if decision.decision is Decision.DENY:
             return _fail(tid, ErrorCode.PERMISSION_DENIED, decision.reason, decision=decision.decision)
         precheck = getattr(tool, "precheck", None)   # reject a malformed call before the user is ever asked
@@ -122,6 +133,24 @@ class ToolRuntime:
             if not approved:
                 return _fail(tid, ErrorCode.CONFIRMATION_REQUIRED, "user did not confirm",
                              decision=decision.decision)
+            protected = getattr(tool, "protected", None)
+            danger = None
+            if protected is not None:
+                try:
+                    danger = protected(args, self.workspace)
+                except ToolError:
+                    danger = None
+            if danger:   # second, explicit yes for system folders and other users' files
+                req2 = ConfirmationRequest(tid, spec.side_effect, redact(f"Are you sure? {action}"),
+                                           redact(f"{danger}. Changing it can break Windows or "
+                                                  f"another person's files."))
+                approved = self.confirmer.confirm(req2, token)
+                if token.is_cancelled:
+                    return _fail(tid, ErrorCode.CANCELLED, "cancelled while awaiting confirmation",
+                                 decision=decision.decision)
+                if not approved:
+                    return _fail(tid, ErrorCode.CONFIRMATION_REQUIRED, "user did not confirm the protected location",
+                                 decision=decision.decision)
 
         attempts = 0
         while True:

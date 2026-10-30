@@ -49,6 +49,13 @@ class PolicyEngine:
         return PolicyDecision(Decision.ALLOW, f"{spec.side_effect} with granted permissions",
                               spec.id, spec.side_effect)
 
+    def escalate(self, d: PolicyDecision, reason: str | None) -> PolicyDecision:
+        """A call's own target (e.g. a file outside the workspace) may raise ALLOW to CONFIRM.
+        It can never lower a decision: DENY stays DENY and CONFIRM stays CONFIRM."""
+        if reason and d.decision is Decision.ALLOW:
+            return PolicyDecision(Decision.CONFIRM, reason, d.tool_id, d.side_effect)
+        return d
+
 
 @dataclass(frozen=True)
 class ConfirmationRequest:

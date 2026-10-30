@@ -31,11 +31,11 @@ ORION is an assistant that operates your Windows computer for you. Tell it, or s
 ## Staying in control
 - **Kill switch:** the red **STOP** button, or **Ctrl+Alt+End** anywhere. Everything stops at once, including an open dialog.
 - **Approvals:** anything that sends something (submitting a form, applying, posting) or deletes something always waits for your yes, and the dialog shows exactly what will be sent. Settings has an option to approve every change.
-- **What ORION never does:** type passwords (sign in yourself in ORION's own browser window), get around CAPTCHAs, follow instructions written inside web pages or documents, touch files outside its `workspace` folder, or send anything you did not approve. If your goal says "don't apply" or "don't submit", the sending tool is not even available for that task.
+- **What ORION never does:** type passwords (sign in yourself in ORION's own browser window), get around CAPTCHAs, follow instructions written inside web pages or documents, change files outside its `workspace` folder without asking (it reads any file you point it to with a full path; it asks before creating, copying or deleting elsewhere, and twice in Windows system folders), or send anything you did not approve. If your goal says "don't apply" or "don't submit", the sending tool is not even available for that task.
 - **Honest results:** the result line starting with "Verified by ORION" lists only what its tools actually confirmed (files created, forms sent).
 
 ## Where things are
-- `workspace\`: the only folder ORION's file tools use; documents it writes appear here (Settings -> Open the workspace folder).
+- `workspace\`: ORION's own folder; documents it writes appear here (Settings -> Open the workspace folder).
 - `data\`: your Memory (`profile.json`), settings, task history and logs (secrets redacted), and ORION's own browser profile.
 - `orion.toml` (optional): settings such as permissions; unknown keys are rejected so a typo cannot switch off a safety setting.
 

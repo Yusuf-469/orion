@@ -21,7 +21,7 @@ Retries: only for tools marked **idempotent**, only on `timeout` / `application_
 
 | Permission | Granted by default | Notes |
 |---|---|---|
-| `files.read` | yes | read and list inside the workspace |
+| `files.read` | yes | read and list files: relative paths inside the workspace, full paths anywhere on the PC |
 | `files.write` | yes | create new files and copies; never overwrite |
 | `app.launch` | yes | allowlisted apps only |
 | `files.delete` | **no** | add to `granted_permissions` in `orion.toml`; every delete still asks |
@@ -39,8 +39,11 @@ Retries: only for tools marked **idempotent**, only on `timeout` / `application_
 | `files.delete` | **consequential** | files.delete | no | 10 s | source gone; trash copy has the same SHA-256 |
 | `app.launch` | reversible | app.launch | no | 15 s | a **new** visible window for the app appears |
 
-### Workspace confinement (all file tools)
-Paths are relative to `workspace_dir` (default `workspace/`, gitignored). Rejected before any disk access: absolute paths, drive letters (`C:x`), UNC paths, `..`, `:` (alternate data streams), reserved device names (`CON`, `NUL`, `COM1`, …), names ending in `.` or space, NUL bytes, and ORION's own `.orion_trash/`. The final check resolves symlinks and junctions and requires the real path to be inside the workspace. Tested with a real junction pointing outside (`tests/safety/test_file_tools.py`).
+### Paths: workspace by default, anywhere with a full path (2026-10-31)
+A relative path is inside `workspace_dir`. A full local path (`C:\...`) reaches any file on the PC: `files.read`, `files.list`, `docs.read_document`, `docs.summarize_csv` (source) and the source of `files.copy` read it without asking. `files.write_new` and the destination of `files.copy` outside the workspace raise the policy decision to **confirm** (`ToolRuntime._decide` + `PolicyEngine.escalate`: a call can raise a decision, never lower it). `files.delete` always confirms. Windows system folders (Windows, Program Files, ProgramData), drive roots, recovery/boot folders and other users' profiles need a **second** confirmation. Full paths still reject UNC/network paths (credential leak), `..`, alternate data streams, device names and aliased names (`tests/safety/test_files_anywhere.py`).
+
+### Relative paths (all file tools)
+Relative paths are confined to `workspace_dir` (default `workspace/`, gitignored). Rejected before any disk access: drive-relative paths (`C:x`), UNC paths, `..`, `:` (alternate data streams), reserved device names (`CON`, `NUL`, `COM1`, …), names ending in `.` or space, NUL bytes, and ORION's own `.orion_trash/`. The final check resolves symlinks and junctions and requires the real path to be inside the workspace. Tested with a real junction pointing outside (`tests/safety/test_file_tools.py`).
 
 ### Delete is a move
 `files.delete` moves the file to `workspace/.orion_trash/<timestamp>_<name>`. There is no undo command yet; restoring means moving it back by hand. The confirmation dialog says so.

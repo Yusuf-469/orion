@@ -19,7 +19,7 @@ from orion.planner.schemas import (
 from orion.policy.engine import Decision, PolicyEngine
 from orion.tools.base import SideEffect
 from orion.tools.errors import ToolError
-from orion.tools.files.workspace import resolve_in_workspace
+from orion.tools.files.workspace import resolve_path
 from orion.tools.registry import ToolRegistry
 
 # Arguments that name something a non-read-only tool changes.
@@ -260,7 +260,7 @@ def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by
             v = s.args.get(k)
             if isinstance(v, str) and parse_ref(v) is None:
                 try:
-                    resolve_in_workspace(workspace, v)
+                    resolve_path(workspace, v)
                 except ToolError as e:
                     err("outside_workspace", e.message, s.id)
                     continue
@@ -294,6 +294,6 @@ def _validate_step(s: PlanStep, goal: Goal, registry, policy, workspace, anc, by
 def _validate_check(check, workspace: Path, sid: str | None, err) -> None:
     for p in _check_paths(check):
         try:
-            resolve_in_workspace(workspace, p)
+            resolve_path(workspace, p)
         except ToolError as e:
             err("invalid_check", e.message, sid)

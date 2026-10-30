@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from orion.tools.base import Idempotency, Permission, SideEffect, Tool, ToolContext, ToolSpec
 from orion.tools.errors import ErrorCode, ToolError
-from orion.tools.files.workspace import rel_display, resolve_in_workspace
+from orion.tools.files.workspace import display, rel_display, resolve_in_workspace, resolve_path
 
 
 class DocArgs(BaseModel):
@@ -87,22 +87,18 @@ class ReadDocOut(BaseModel):
 
 class ReadDocumentTool(Tool[ReadDocArgs, ReadDocOut]):
     spec = ToolSpec(
-        id="docs.read_document", version="1.0",
-        description="Read the text of a document in the workspace (.docx, .pdf, .txt, .md), e.g. a CV.",
+        id="docs.read_document", version="1.1",
+        description="Read the text of a document (.docx, .pdf, .txt, .md), e.g. a CV. A relative path is "
+                    "inside the workspace; a full path (C:\\...) reads it anywhere on the PC.",
         input_model=ReadDocArgs, output_model=ReadDocOut, permissions=frozenset({Permission.FILES_READ}),
         side_effect=SideEffect.READ_ONLY, timeout_s=30, idempotency=Idempotency.IDEMPOTENT,
         verification="text extracted from the file itself",
     )
 
     def run(self, args: ReadDocArgs, ctx: ToolContext) -> ReadDocOut:
-        from pathlib import Path
-        raw = Path(args.path)
-        if raw.is_absolute():
-            p = raw
-        else:
-            p = resolve_in_workspace(ctx.workspace, args.path)
+        p = resolve_path(ctx.workspace, args.path)   # a full path reads anywhere on the PC
         if not p.is_file():
-            raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no file {args.path!r} in the workspace")
+            raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no file {args.path!r}")
         ext = p.suffix.lower()
         if ext == ".docx":
             import docx
@@ -118,9 +114,9 @@ class ReadDocumentTool(Tool[ReadDocArgs, ReadDocOut]):
         text = text.strip()[:20_000]
         if not text:
             raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"{args.path!r} has no readable text (a scanned image?)")
-        display = str(p) if raw.is_absolute() else rel_display(ctx.workspace, p)
-        return ReadDocOut(path=display, text=text,
-                          evidence=f"read {len(text)} characters from {display} (untrusted file text)")
+        shown = display(ctx.workspace, p)
+        return ReadDocOut(path=shown, text=text,
+                          evidence=f"read {len(text)} characters from {shown} (untrusted file text)")
 
 
 class WriteDocumentTool(Tool[DocArgs, DocOut]):

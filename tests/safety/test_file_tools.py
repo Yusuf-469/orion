@@ -58,10 +58,11 @@ def test_paths_outside_or_aliasing_rejected(ws, bad):
     assert e.value.code in (ErrorCode.PERMISSION_DENIED, ErrorCode.INVALID_INPUT)
 
 
-@pytest.mark.parametrize("bad", ["..\\outside.txt", "C:\\Users\\Public\\orion_test.txt"])
-def test_write_outside_workspace_never_touches_disk(ws, bad):
+@pytest.mark.parametrize("bad,code", [("..\\outside.txt", ErrorCode.PERMISSION_DENIED),
+                                      ("C:\\Users\\Public\\orion_test.txt", ErrorCode.CONFIRMATION_REQUIRED)])
+def test_write_outside_workspace_never_touches_disk_without_a_yes(ws, bad, code):
     r = call(runtime(ws), "files.write_new", path=bad, content="x")
-    assert r.error_code == ErrorCode.PERMISSION_DENIED
+    assert r.error_code == code
     assert not (ws.parent / "outside.txt").exists()
     assert not Path("C:/Users/Public/orion_test.txt").exists()
 

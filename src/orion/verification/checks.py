@@ -15,7 +15,7 @@ from orion.planner.schemas import (
     AppWindowOpen, FileAbsent, FileContains, FileExists, FilesIdentical, NotepadShows,
 )
 from orion.tools.errors import ToolError
-from orion.tools.files.workspace import resolve_in_workspace
+from orion.tools.files.workspace import resolve_path
 
 
 @dataclass(frozen=True)
@@ -47,22 +47,22 @@ class Verifier:
     def _check(self, c) -> CheckResult:
         ws = self.workspace
         if isinstance(c, FileExists):
-            p = resolve_in_workspace(ws, c.path)
+            p = resolve_path(ws, c.path)
             ok = p.is_file()
             return CheckResult(ok, f"file_exists {c.path}: " + (f"yes, {p.stat().st_size} bytes" if ok else "NO"))
         if isinstance(c, FileAbsent):
-            p = resolve_in_workspace(ws, c.path)
+            p = resolve_path(ws, c.path)
             ok = not p.exists()
             return CheckResult(ok, f"file_absent {c.path}: " + ("absent" if ok else "STILL PRESENT"))
         if isinstance(c, FileContains):
-            p = resolve_in_workspace(ws, c.path)
+            p = resolve_path(ws, c.path)
             if not p.is_file():
                 return CheckResult(False, f"file_contains {c.path}: file missing")
             text = p.read_bytes().decode("utf-8-sig", errors="replace")
             ok = (c.text.lower() in text.lower()) if c.ignore_case else (c.text in text)
             return CheckResult(ok, f"file_contains {c.path}: " + ("text found" if ok else "text NOT found"))
         if isinstance(c, FilesIdentical):
-            a, b = resolve_in_workspace(ws, c.a), resolve_in_workspace(ws, c.b)
+            a, b = resolve_path(ws, c.a), resolve_path(ws, c.b)
             if not (a.is_file() and b.is_file()):
                 return CheckResult(False, f"files_identical {c.a} {c.b}: missing "
                                           f"{', '.join(x for x, p in ((c.a, a), (c.b, b)) if not p.is_file())}")
@@ -73,7 +73,7 @@ class Verifier:
             if sys.platform != "win32":
                 return CheckResult(False, "notepad_shows: unsupported on this OS")
             from orion.tools.windows.notepad import _norm_text, read_tab_text
-            p = resolve_in_workspace(ws, c.path)
+            p = resolve_path(ws, c.path)
             if not p.is_file():
                 return CheckResult(False, f"notepad_shows {c.path}: file missing")
             shown = read_tab_text(p.name)

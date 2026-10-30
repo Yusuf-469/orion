@@ -1,7 +1,7 @@
 # Safety and Privacy (v2, Stage 2)
 
 ## What ORION can do at Stage 2
-- Read, list, create (never overwrite), copy and delete-to-trash files **inside `workspace/` only**.
+- Read and list files anywhere on the PC (full paths). Create (never overwrite), copy and delete-to-trash anywhere too, but outside `workspace/` it asks first, and in Windows system folders or other users' profiles it asks twice. Nothing is sent off the PC without approval.
 - Open Notepad, Calculator or Paint (no arguments).
 - Nothing else: no shell, no browser, no network, no UI clicking or typing yet. It does not interpret goals; you pick a tool.
 
@@ -14,7 +14,8 @@
 | Least privilege | `files.delete` not granted by default | `tests/unit/test_config.py` |
 | Confirmation | Consequential actions always ask; default button is **No**; one approval covers one call | `test_tool_console.py`, `test_policy_and_runtime.py` |
 | No relabelling | Policy reads the registered spec; a call cannot carry its own side-effect label; specs are immutable | `test_policy_and_runtime.py` |
-| Workspace confinement | Traversal, absolute/UNC/drive paths, ADS, device names and junction escapes are rejected | `tests/safety/test_file_tools.py` (incl. a real junction) |
+| Workspace confinement (relative paths) | Traversal, UNC/drive-relative paths, ADS, device names and junction escapes are rejected | `tests/safety/test_file_tools.py` (incl. a real junction) |
+| Files anywhere (full paths) | Reads free; changes outside the workspace confirm; protected locations confirm twice; UNC/ADS/`..` rejected | `tests/safety/test_files_anywhere.py` (16 tests) |
 | No overwrite | write/copy use exclusive create | `test_file_tools.py` |
 | Honest outcomes | Timeouts and cancels of non-read-only tools are marked **uncertain** (needs review), never success | `test_policy_and_runtime.py` |
 | Strict config | Unknown keys, bad types and misspelt permissions are errors | `test_config.py` |

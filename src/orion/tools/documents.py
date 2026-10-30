@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from orion.tools.base import Idempotency, Permission, SideEffect, Tool, ToolContext, ToolSpec
 from orion.tools.errors import ErrorCode, ToolError
-from orion.tools.files.workspace import rel_display, resolve_in_workspace
+from orion.tools.files.workspace import rel_display, resolve_in_workspace, resolve_path
 
 
 def _new_file(ctx: ToolContext, rel: str):
@@ -101,9 +101,9 @@ class SummarizeCsvTool(Tool[SummarizeArgs, Out]):
     )
 
     def run(self, args: SummarizeArgs, ctx: ToolContext) -> Out:
-        src = resolve_in_workspace(ctx.workspace, args.src)
+        src = resolve_path(ctx.workspace, args.src)   # the CSV may be anywhere on the PC
         if not src.is_file():
-            raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no file {args.src!r} in workspace")
+            raise ToolError(ErrorCode.TARGET_NOT_FOUND, f"no file {args.src!r}")
         data = list(csv.reader(open(src, encoding="utf-8-sig", newline="")))
         if len(data) < 2:
             raise ToolError(ErrorCode.INVALID_INPUT, f"{args.src!r} has no data rows under a header")
