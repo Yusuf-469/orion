@@ -7,6 +7,8 @@
 
 - **ui-ux-pro-max** by Next Level Builder, MIT licence (github.com/nextlevelbuilder/ui-ux-pro-max-skill). Its interface-quality rules shaped ORION's UI pass: visible focus rings, 44px touch targets, SVG icons instead of symbol characters, 16px base text, reduced-motion support and the Space Grotesk / DM Sans pairing. The icons themselves were drawn for ORION.
 
+- **browser-use** (github.com/browser-use/browser-use), MIT. ORION's page snapshot (`src/orion/tools/web/session.py`) adopts its clickability heuristics: elements with click handlers or `tabindex`, extra ARIA widget roles, the outermost `cursor: pointer` element of a widget, open shadow roots, and telling the agent how much of the page lies above and below. Re-implemented in ORION's own snapshot script; no browser-use code or dependency.
+
 ## Code adapted
 - **OmniParser** by Microsoft (github.com/microsoft/OmniParser), code MIT. `src/orion/grounding/detector.py` adapts the YOLOv9 detector wrapper (`util/yolov9.py`): letterbox preprocessing, anchor-free decode and NMS. Weight `icon_detect_v3` (microsoft/OmniParser-v2.0 on Hugging Face, revision refs/pr/37), MIT, downloaded to `models/omniparser/` and not committed. Only the MIT detector is used; the older Ultralytics-based AGPL detectors and the caption models are not.
 

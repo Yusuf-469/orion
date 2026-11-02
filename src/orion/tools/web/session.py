@@ -55,16 +55,40 @@ SNAPSHOT_JS = r"""
               const h = rg.querySelector('[role=heading], h1, h2, h3, h4, legend'); if (h) return clean(h.innerText); }
     return '';
   };
-  document.querySelectorAll('[data-orion-ref]').forEach(e => e.removeAttribute('data-orion-ref'));
+  // Beyond standard controls (ideas from browser-use, MIT): click handlers, focusable elements, more ARIA
+  // roles, and the outermost cursor:pointer element of a widget; open shadow roots are walked too.
+  const extraRoles = new Set(['slider', 'spinbutton', 'searchbox', 'gridcell', 'treeitem', 'menuitemcheckbox',
+                              'menuitemradio', 'listbox', 'row']);
+  const all = []; const walk = root => { for (const e of root.querySelectorAll('*')) { all.push(e);
+                                          if (e.shadowRoot) walk(e.shadowRoot); } };
+  walk(document);
+  all.forEach(e => e.removeAttribute('data-orion-ref'));
+  const vw = innerWidth * innerHeight;
+  const chosen = new Set();
+  const insideChosen = e => { for (let p = e.parentElement || (e.getRootNode() && e.getRootNode().host); p;
+                                   p = p.parentElement || (p.getRootNode() && p.getRootNode().host)) {
+                                if (chosen.has(p)) return true; } return false; };
+  const extra = e => {
+    if (e.matches('html, body, svg *, option, label')) return false;
+    if (['onclick', 'onmousedown', 'onmouseup'].some(a => e.hasAttribute(a))) return true;
+    if (extraRoles.has(e.getAttribute('role'))) return true;
+    const ti = e.getAttribute('tabindex'); if (ti !== null && parseInt(ti, 10) >= 0) return true;
+    if (getComputedStyle(e).cursor !== 'pointer') return false;
+    const up = e.parentElement; if (up && getComputedStyle(up).cursor === 'pointer') return false;   // outermost only
+    const r = e.getBoundingClientRect(); if (r.width * r.height > vw * 0.4) return false;   // not whole sections
+    if (e.querySelector(sel)) return false;   // a card around a real link/button: the inner control is listed
+    return !!(clean(e.innerText) || e.getAttribute('aria-label') || e.title);
+  };
+  const cands = all.filter(e => (e.matches(sel) || (extra(e) && !insideChosen(e))) && (chosen.add(e), true));
   const out = []; let n = 0;
-  for (const e of document.querySelectorAll(sel)) {
+  for (const e of cands) {
     if (!visible(e) || e.disabled || e.getAttribute('aria-disabled') === 'true') continue;
     n += 1; e.setAttribute('data-orion-ref', String(n));
     const tag = e.tagName.toLowerCase(); const type = (e.getAttribute('type') || '').toLowerCase();
     const role = e.getAttribute('role') || (tag === 'a' ? 'link' : tag === 'select' ? 'select' :
                  tag === 'textarea' ? 'textbox' : tag === 'button' ? 'button' :
                  ['checkbox', 'radio'].includes(type) ? type : ['submit', 'button', 'reset'].includes(type) ? 'button' :
-                 tag === 'input' ? 'textbox' : tag);
+                 tag === 'input' ? 'textbox' : e.matches(sel) ? tag : 'button');
     const item = {ref: n, role, name: label(e).slice(0, 120)};
     const g = group(e); if (g && g !== item.name) item.group = g.slice(0, 120);
     if (tag === 'input' && !['checkbox', 'radio', 'submit', 'button'].includes(type)) { item.value = e.value; if (type) item.type = type; }

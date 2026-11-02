@@ -147,3 +147,19 @@ def test_write_document_docx(tmp_path):
     assert r.ok and r.output["tables"] == 1 and r.output["headings"] == 2, r.evidence
     r = rt.execute(ToolCall(tool_id="docs.write_document", args={"path": "c.docx", "content": md}), CancelToken())
     assert not r.ok   # never overwrites
+
+
+def test_finds_widgets_beyond_standard_controls(web, site):
+    """browser-use ideas: click handlers, pointer-styled elements, ARIA widgets, shadow DOM, scroll note."""
+    call, _, _ = web
+    assert call("web.open", url=site + "/widgets.html").ok
+    look = call("web.look")
+    names = [e["name"] for e in look.output["elements"]]
+    for want in ("Open settings", "Dark mode", "Volume", "Rate 5 stars", "Read the details"):
+        assert any(want in n for n in names), (want, names)
+    assert not any(n.startswith("Read the details about") for n in names)   # the card is not listed twice
+    assert "more below" in look.output["scroll"]
+    for name in ("Dark mode", "Rate 5 stars", "Open settings"):
+        assert call("web.click", ref=ref(look, name)).ok
+        assert f"clicked: {name}" in call("web.read").output["text"]
+        look = call("web.look")

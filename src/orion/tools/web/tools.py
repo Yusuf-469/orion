@@ -164,8 +164,13 @@ class LookOut(BaseModel):
     title: str
     elements: list[dict[str, Any]]
     text: str
+    scroll: str = ""
     untrusted: bool = True
     evidence: str
+
+
+SCROLL_JS = """() => { const above = Math.round(scrollY), below = Math.round(document.documentElement.scrollHeight
+                       - scrollY - innerHeight); return [above, Math.max(0, below)]; }"""
 
 
 class LookTool(_WebTool):
@@ -179,11 +184,15 @@ class LookTool(_WebTool):
     def run(self, args: NoArgs, ctx: ToolContext) -> LookOut:
         def go(page):
             _settle(page)
-            return page.url, page.title(), self.session.snapshot(page), self.session.text(page, LOOK_TEXT)
-        url, title, items, text = self.session.call(go)
-        return LookOut(url=url, title=title, elements=items, text=text,
+            return (page.url, page.title(), self.session.snapshot(page), self.session.text(page, LOOK_TEXT),
+                    page.evaluate(SCROLL_JS))
+        url, title, items, text, (above, below) = self.session.call(go)
+        # Tells the agent the page goes on (browser-use idea), so it scrolls or reads instead of giving up.
+        scroll = (f"{above}px above, {below}px more below" if above or below > 50 else "whole page visible")
+        return LookOut(url=url, title=title, elements=items, text=text, scroll=scroll,
                        evidence=f"'{title}': {len(items)} interactive elements "
-                                f"({sum(1 for i in items if i.get('consequential'))} that would send something)")
+                                f"({sum(1 for i in items if i.get('consequential'))} that would send something); "
+                                f"{scroll}")
 
 
 class ReadOut(BaseModel):

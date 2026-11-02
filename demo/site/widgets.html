@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Widget test page</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 24px; }
+  .chip { cursor: pointer; padding: 6px 12px; border: 1px solid #888; border-radius: 16px; display: inline-block; }
+  .card { cursor: pointer; border: 1px solid #ccc; padding: 12px; width: 260px; margin: 12px 0; }
+  .tall { height: 1600px; }
+</style></head>
+<body>
+<main>
+  <h1>Widgets that are not standard controls</h1>
+  <p id="status">nothing clicked yet</p>
+  <div onclick="document.getElementById('status').textContent = 'clicked: Open settings'">Open settings</div>
+  <span class="chip" id="chip">Dark mode</span>
+  <div class="card" id="card"><a href="#details">Read the details</a> about this plan.</div>
+  <div tabindex="0" role="slider" aria-label="Volume" aria-valuenow="40">Volume 40</div>
+  <star-rating></star-rating>
+  <div class="tall"></div>
+  <p>End of page.</p>
+</main>
+<script>
+  document.getElementById('chip').addEventListener('click', () => {
+    document.getElementById('status').textContent = 'clicked: Dark mode';
+  });
+  customElements.define('star-rating', class extends HTMLElement {
+    connectedCallback() {
+      const root = this.attachShadow({ mode: 'open' });
+      root.innerHTML = '<button id="rate">Rate 5 stars</button>';
+      root.getElementById('rate').addEventListener('click', () => {
+        document.getElementById('status').textContent = 'clicked: Rate 5 stars';
+      });
+    }
+  });
+</script>
+</body>
+</html>
