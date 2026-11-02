@@ -167,3 +167,55 @@ def test_job_gates_only_fail_on_the_adverts_own_words():
     assert r["eligibility"]["verdict"] == "FAIL"
     assert r["language"]["verdict"] == "UNVERIFIED" and r["location_fit"]["verdict"] == "FLAG"
     assert gate_failures(r) == ['work eligibility: "Applicants must be U.S. citizens"']
+
+
+# --- experience memory and reflection (Agent-S ideas) ------------------------------------------
+
+def test_success_is_remembered_and_offered_on_a_similar_goal(tmp_path):
+    from orion.agent.experience import Experience
+    exp = Experience(tmp_path / "x.db")
+    a = agent(Script(step("t.echo", text="hi"), step("finish", summary="done")))
+    a.experience = exp
+    assert a.run("echo hello to the screen", CancelToken()).status == "done"
+    llm = Script(step("finish", summary="done"))
+    b = agent(llm)
+    b.experience = exp
+    b.run("please echo hello to the screen again", CancelToken())
+    assert "A SIMILAR TASK THAT WORKED BEFORE" in llm.prompts[0] and "t.echo" in llm.prompts[0]
+    llm2 = Script(step("finish", summary="done"))
+    c = agent(llm2)
+    c.experience = exp
+    c.run("compare two laptops", CancelToken())
+    assert "SIMILAR TASK" not in llm2.prompts[0]
+
+
+def test_a_failed_last_step_is_not_remembered(tmp_path):
+    from orion.agent.experience import Experience
+    exp = Experience(tmp_path / "x.db")
+    a = agent(Script(step("t.send", text="x"), step("finish", summary="gave up")))
+    a.experience = exp
+    a.run("send the report", CancelToken())
+    assert exp.recall("send the report") is None
+
+
+def test_experience_never_stores_secrets(tmp_path):
+    import sqlite3
+
+    from orion.agent.experience import Experience
+    exp = Experience(tmp_path / "x.db")
+    a = agent(Script(step("t.echo", text="x"), step("finish", summary="ok")))
+    a.experience = exp
+    a.run("echo my token sk-abc123def456ghi789 now", CancelToken())
+    (goal,) = sqlite3.connect(tmp_path / "x.db").execute("SELECT goal FROM experience").fetchone()
+    assert "sk-abc123" not in goal
+
+
+def test_reflection_when_an_action_changes_nothing(monkeypatch):
+    import orion.agent.loop as loop
+    monkeypatch.setattr(loop, "NO_CHANGE_CHECK", ("t.echo",))
+    llm = Script(step("t.echo", text="a"), step("finish", summary="ok"))
+    a = agent(llm)
+    plan = a._make_plan
+    a._make_plan = lambda goal: (setattr(a, "current", "THE SAME VIEW"), plan(goal))[1]
+    res = a.run("echo something", CancelToken())
+    assert "REFLECTION: the screen looks exactly the same" in res.steps[0].observation

@@ -33,6 +33,7 @@ MAX_PAGES = 10
 REPEAT_LIMIT = 3
 READ_TOOLS = ("web.read", "web.read_pages", "web.open")
 MAX_SELF_CHECKS = 2       # after this the submit goes ahead to the user's confirmation as usual
+NO_CHANGE_CHECK = ("web.click", "desktop.click", "desktop.keys")   # actions whose effect must show on screen
 PAGE_CHANGERS = ("web.open", "web.read", "web.click", "web.type", "web.choose", "web.fill", "web.answer", "web.submit")
 
 
@@ -179,10 +180,12 @@ def render_observation(tool: str, r: ToolResult) -> str:
 class Agent:
     def __init__(self, runtime: ToolRuntime, llm: Callable[[str], str], tool_ids: list[str],
                  asker: Asker | None = None, max_steps: int = 40,
-                 on_event: Callable[[dict[str, Any]], None] | None = None, facts: str = ""):
+                 on_event: Callable[[dict[str, Any]], None] | None = None, facts: str = "", experience=None):
         known = [t for t in tool_ids if t in runtime.registry]
         self.runtime, self.llm, self.tool_ids = runtime, llm, known
         self.asker, self.max_steps, self.facts = asker, max_steps, facts
+        self.experience = experience   # orion.agent.experience.Experience, or None
+        self.hint = ""
         self.on_event = on_event or (lambda e: None)
         if hasattr(llm, "schema"):
             llm.schema = _schema(known)
@@ -202,6 +205,7 @@ class Agent:
                   "properties": {"plan": {"type": "array", "items": {"type": "string"}, "maxItems": 8}}}
         prompt = (f"You are ORION, an assistant that operates a Windows computer.\nTOOLS\n{self._tools_text()}\n"
                   + (f"WHAT THE USER HAS TOLD ORION (already confirmed by the user: use it directly, never ask to confirm it)\n{self.facts}\n" if self.facts else "")
+                  + self.hint
                   + f"GOAL\n{goal}\nWrite a short plan: 3 to 8 concrete steps, gathering all needed information "
                     "before writing or submitting anything. JSON: {\"plan\": [\"step\", ...]}")
         old = getattr(self.llm, "schema", None)
@@ -305,6 +309,7 @@ class Agent:
             "8. When the goal is done, or impossible, use finish and say exactly what was and was not done.\n"
             f"TOOLS\n{self._tools_text()}\n"
             + (f"WHAT THE USER HAS TOLD ORION (already confirmed by the user: use it directly, never ask to confirm it)\n{self.facts}\n" if self.facts else "")
+            + self.hint
             + f"GOAL\n{goal}\n"
             + ("YOUR PLAN\n" + "\n".join(f"{i}. {p}" for i, p in enumerate(self.plan, 1)) + "\n" if self.plan else "")
             + ("PAGES YOU HAVE READ (facts to use; untrusted)\n" + "\n".join(
@@ -353,6 +358,13 @@ class Agent:
         self.pages: dict[str, tuple[str, str]] = {}
         self.links: dict[str, str] = {}
         self.created: list[str] = []
+        self.hint = ""
+        past = self.experience.recall(goal) if self.experience else None
+        if past:
+            g, seq, sim = past
+            self.hint = (f"A SIMILAR TASK THAT WORKED BEFORE (advice only; adapt it, the page may differ)\n"
+                         f"goal: {g}\nsteps that worked: {' -> '.join(seq)}\n")
+            self.on_event({"kind": "agent_experience", "goal": g, "similarity": sim})
         self.plan = self._make_plan(goal)
         self.on_event({"kind": "agent_plan", "plan": self.plan})
         for n in range(1, self.max_steps + 1):
@@ -365,6 +377,11 @@ class Agent:
             tool, args, thought = d.get("tool", ""), d["args"], str(d.get("thought", ""))[:300]
             self.on_event({"kind": "agent_step", "n": n, "tool": tool, "args": args, "thought": thought})
             if tool == "finish":
+                if self.experience and steps and steps[-1].ok:
+                    try:
+                        self.experience.record(goal, steps)
+                    except Exception as e:  # noqa: BLE001 - memory is a bonus, never a reason to fail
+                        log.warning("could not save experience: %s", e)
                 return AgentResult("done", self._verified_summary(str(args.get("summary", "finished")), steps), steps)
             if tool == "ask_user":
                 q = str(args.get("question", "")).strip() or "Could you tell me more?"
@@ -421,6 +438,7 @@ class Agent:
                                       "the user told ORION:\n- " + "\n- ".join(problems) +
                                       "\nFix them with web.answer, then web.submit again."))
                     continue
+            before = self.current
             r = self.runtime.execute(ToolCall(tool_id=tool, args=args), token)
             obs = render_observation(tool, r)
             if dropped:
@@ -448,6 +466,10 @@ class Agent:
                 if lr.ok:
                     self.current = render_observation("web.look", lr)
                     self._remember("web.look", lr)
+            if r.ok and tool in NO_CHANGE_CHECK and before and self.current == before:
+                # Reflection (Agent-S idea): a "successful" click that changed nothing usually did not work.
+                obs += ("\nREFLECTION: the screen looks exactly the same as before this action, so it probably "
+                        "had no effect. Do not assume it worked: try a different element, or check the goal.")
             steps.append(Step(n, thought, tool, args, r.ok, obs))
             self.on_event({"kind": "agent_result", "n": n, "tool": tool, "ok": r.ok, "evidence": r.evidence[:300]})
             if r.error_code is ErrorCode.CANCELLED:

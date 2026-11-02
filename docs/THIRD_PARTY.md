@@ -9,6 +9,8 @@
 
 - **browser-use** (github.com/browser-use/browser-use), MIT. ORION's page snapshot (`src/orion/tools/web/session.py`) adopts its clickability heuristics: elements with click handlers or `tabindex`, extra ARIA widget roles, the outermost `cursor: pointer` element of a widget, open shadow roots, and telling the agent how much of the page lies above and below. Re-implemented in ORION's own snapshot script; no browser-use code or dependency.
 
+- **Agent-S** by Simular (github.com/simular-ai/Agent-S), Apache-2.0. Two ideas re-implemented in ORION's agent loop: experience memory (`src/orion/agent/experience.py`: verified successful step sequences, stored locally in SQLite with secrets redacted, offered as advice on similar goals) and reflection (a click or keypress that leaves the screen unchanged is flagged to the model as probably ineffective). No Agent-S code is used; its UI-TARS grounding model is not used (too large for the 8 GB GPU next to the local LLM).
+
 ## Code adapted
 - **OmniParser** by Microsoft (github.com/microsoft/OmniParser), code MIT. `src/orion/grounding/detector.py` adapts the YOLOv9 detector wrapper (`util/yolov9.py`): letterbox preprocessing, anchor-free decode and NMS. Weight `icon_detect_v3` (microsoft/OmniParser-v2.0 on Hugging Face, revision refs/pr/37), MIT, downloaded to `models/omniparser/` and not committed. Only the MIT detector is used; the older Ultralytics-based AGPL detectors and the caption models are not.
 

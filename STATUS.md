@@ -98,6 +98,7 @@ Venv: Python 3.11.9 (Microsoft Store base), PySide6 6.12.0, pydantic 2.14.1, pyt
 | Files anywhere on the PC (full paths; outside-workspace changes confirm, system folders confirm twice) | implemented-real (unit/safety, temp dirs only) | `tests/safety/test_files_anywhere.py` 16/16; offscreen suite 294 passed (2026-10-31) |
 | Screen vision in desktop.look (OmniParser v3 detector + local OCR): controls UI Automation cannot see, clicked with a covered-window check | implemented-real | tests/integration/test_desktop_vision.py (real: drawn Export button seen, clicked, app log confirms) + tests/unit/test_vision_elements.py 4/4; detector 14/14 controls on ORION's own window; first call 15 s, warm ~0.2-2 s on RTX 4060 (2026-11-02) |
 | Web snapshot sees non-standard widgets (click handlers, pointer-styled elements, ARIA widgets, shadow DOM) + scroll note | implemented-real | tests/integration/test_web_tools.py::test_finds_widgets_beyond_standard_controls on demo/site/widgets.html; web suite 7/7 (2026-11-02) |
+| Experience memory (similar past successes as advice) + no-change reflection | implemented-mock (scripted model) | tests/unit/test_agent_loop.py: 4 new tests (recall on similar goal, not on unrelated, failed runs not saved, secrets redacted, reflection); not yet measured on real trials (2026-11-02) |
 | Release with the new interface | verified (built app) | zip 286 MB, self-test 6/6; packaged app: Calculator goal done (360, 21 s), comparison goal wrote comparison.docx (36 s) |
 
 ## Test totals (2026-10-24, end of session)

@@ -397,11 +397,16 @@ class Backend:
                 self.emit({"kind": "step", "text": f"{e['tool']}: {e['evidence']}", "ok": e["ok"]})
                 if e["tool"].startswith("web.") and e["tool"] not in ("web.search", "web.read_pages"):
                     self._live_view()
+            elif e["kind"] == "agent_experience":
+                self.emit({"kind": "step", "ok": True,
+                           "text": f"Remembered a similar task that worked before: \"{e['goal'][:80]}\""})
             elif e["kind"] == "agent_selfcheck":
                 self.emit({"kind": "step", "ok": not e["problems"],
                            "text": "Self-check: " + ("all answers match what you told me" if not e["problems"]
                                                      else "; ".join(e["problems"]))})
-        agent = Agent(rt, llm, tools, asker=self, on_event=on_event, facts=facts, max_steps=40)
+        from orion.agent.experience import Experience
+        agent = Agent(rt, llm, tools, asker=self, on_event=on_event, facts=facts, max_steps=40,
+                      experience=Experience(self.cfg.db_path))
         res = agent.run(goal, self.token)
         return res.status, res.summary
 
