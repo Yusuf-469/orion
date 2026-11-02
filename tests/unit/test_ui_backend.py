@@ -26,6 +26,7 @@ def backend(tmp_path):
     ("Compare the Pixel 9 and iPhone 16", "research.compare"),
     ("Work out 15% of 2400 in Calculator", "calculator.compute"),
     ("Fill in the survey form at https://example.com/form", "web.search"),
+    ("Add a total row to sales.xlsx and save it as a PDF", "excel.read"),
 ])
 def test_tools_are_routed_by_goal(goal, first):
     from orion.ui.backend import choose_tools

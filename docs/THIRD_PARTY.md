@@ -11,6 +11,9 @@
 
 - **Agent-S** by Simular (github.com/simular-ai/Agent-S), Apache-2.0. Two ideas re-implemented in ORION's agent loop: experience memory (`src/orion/agent/experience.py`: verified successful step sequences, stored locally in SQLite with secrets redacted, offered as advice on similar goals) and reflection (a click or keypress that leaves the screen unchanged is flagged to the model as probably ineffective). No Agent-S code is used; its UI-TARS grounding model is not used (too large for the 8 GB GPU next to the local LLM).
 
+- **UFO** by Microsoft (github.com/microsoft/UFO), MIT. Its practice of driving Office through the applications' own APIs instead of clicking led to `src/orion/tools/office.py` (excel.read, excel.write, office.export_pdf over COM), written for ORION: a private hidden Office instance per call, macros forced off, read-only opening, new files only, read-back verification. No UFO code is used.
+- **Open Interpreter** (github.com/openinterpreter/openinterpreter), Apache-2.0: reviewed, not used. It is now a coding-agent harness that works by running model-written shell code, which ORION's rules forbid.
+
 ## Code adapted
 - **OmniParser** by Microsoft (github.com/microsoft/OmniParser), code MIT. `src/orion/grounding/detector.py` adapts the YOLOv9 detector wrapper (`util/yolov9.py`): letterbox preprocessing, anchor-free decode and NMS. Weight `icon_detect_v3` (microsoft/OmniParser-v2.0 on Hugging Face, revision refs/pr/37), MIT, downloaded to `models/omniparser/` and not committed. Only the MIT detector is used; the older Ultralytics-based AGPL detectors and the caption models are not.
 

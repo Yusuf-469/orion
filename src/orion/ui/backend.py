@@ -39,6 +39,11 @@ def choose_tools(goal: str) -> list[str]:
         return ["jobs.shortlist", "files.list", "docs.read_document"]
     if re.search(r"\bcompar|\bvs\.?\b|versus|which (is|one) (is )?better|pros and cons", goal, re.I):
         return ["research.compare", "files.list", "docs.read_document"]
+    if re.search(r"excel|spreadsheet|workbook|\.xlsx?\b|\.csv\b|\bpdf\b", goal, re.I):
+        # Office through its own interface: exact and fast, no clicking (idea from Microsoft UFO).
+        office = ["excel.read", "excel.write", "office.export_pdf", "files.list", "docs.read_document",
+                  "docs.write_document", "docs.summarize_csv"]
+        return [*office, *AGENT_TOOL_IDS] if WEB_WORDS.search(goal) else office
     desk = ["calculator.compute", "app.launch", "desktop.look", "desktop.click", "desktop.type", "desktop.keys"]
     if re.search(r"calculat|\bsum\b|percent|%|\bwork out\b", goal, re.I) and not WEB_WORDS.search(goal):
         # A verified tool exists: offer it alone. With generic clicking also on offer the model sometimes
@@ -139,7 +144,8 @@ class Backend:
             self._session = WebSession(Path(self.cfg.data_dir) / "browser_profile", headless=False)
         reg = build_registry()
         skill_llm = lambda: OllamaBackend(self.settings["model"], timeout_s=240, num_ctx=8192, num_predict=600)  # noqa: E731
-        for t in [*web_tools(self._session), *desktop_tools(), WriteDocumentTool(), ReadDocumentTool(),
+        from orion.tools.office import office_tools
+        for t in [*web_tools(self._session), *desktop_tools(), *office_tools(), WriteDocumentTool(), ReadDocumentTool(),
                   JobShortlistTool(self._session, skill_llm),
                   CompareTool(self._session, lambda: OllamaBackend(self.settings["model"], timeout_s=300,
                                                                    num_ctx=16384, num_predict=1500), DEFAULT_SEARCH)]:
