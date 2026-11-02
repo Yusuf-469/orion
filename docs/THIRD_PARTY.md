@@ -7,6 +7,9 @@
 
 - **ui-ux-pro-max** by Next Level Builder, MIT licence (github.com/nextlevelbuilder/ui-ux-pro-max-skill). Its interface-quality rules shaped ORION's UI pass: visible focus rings, 44px touch targets, SVG icons instead of symbol characters, 16px base text, reduced-motion support and the Space Grotesk / DM Sans pairing. The icons themselves were drawn for ORION.
 
+## Code adapted
+- **OmniParser** by Microsoft (github.com/microsoft/OmniParser), code MIT. `src/orion/grounding/detector.py` adapts the YOLOv9 detector wrapper (`util/yolov9.py`): letterbox preprocessing, anchor-free decode and NMS. Weight `icon_detect_v3` (microsoft/OmniParser-v2.0 on Hugging Face, revision refs/pr/37), MIT, downloaded to `models/omniparser/` and not committed. Only the MIT detector is used; the older Ultralytics-based AGPL detectors and the caption models are not.
+
 ## Fonts (bundled)
 Space Grotesk (Florian Karsten) and DM Sans (Colophon Foundry), both SIL Open Font License 1.1, shipped unmodified as woff2 in `src/orion/ui/web/fonts/`.
 

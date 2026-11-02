@@ -130,6 +130,33 @@ def _refind(auto, win, crit: dict[str, Any]):
 class LookArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
     app: str = Field(min_length=1, max_length=60)
+    vision: bool = Field(default=True, description="also read the screen (OCR + element detector) for controls "
+                                                   "UI Automation cannot see")
+
+
+def _vision_items(auto, win, known_rects: list[tuple[int, int, int, int]], start: int):
+    """Elements seen on screen but not exposed by UI Automation: (items, crit) numbered from `start`."""
+    from orion.grounding import detector
+    from orion.grounding.screen import Box, capture_window, ensure_dpi_aware, ocr_window
+    from orion.grounding.vision import elements, where
+    ensure_dpi_aware()
+    hwnd = win.NativeWindowHandle
+    img, rect = capture_window(hwnd)
+    seen = elements(ocr_window(hwnd), detector.detect(img, (rect.left, rect.top)),
+                    [Box(*r) for r in known_rects])
+    items, crit = [], {}
+    for s in seen:
+        ref = start + len(items)
+        item: dict[str, Any] = {"ref": ref, "role": s.role, "name": s.name, "seen": "on screen",
+                                "where": where(s.box, rect)}
+        if s.role != "text" and _SENDS.search(s.name):
+            item["consequential"] = True
+        items.append(item)
+        crit[ref] = {"vision": True, "name": s.name, "box": (s.box.left, s.box.top, s.box.right, s.box.bottom),
+                     "win": (rect.left, rect.top), "item": item}
+        if start + len(items) > MAX_ITEMS:
+            break
+    return items, crit
 
 
 class LookOut(BaseModel):
@@ -140,12 +167,14 @@ class LookOut(BaseModel):
 
 
 class DesktopLookTool(Tool[LookArgs, LookOut]):
-    spec = ToolSpec(id="desktop.look", version="1.0",
+    spec = ToolSpec(id="desktop.look", version="1.1",
                     description="Look at an allowed app's window (calculator, paint, canvas demo): numbered buttons, "
-                                "fields, menus and text. Use the numbers with desktop.click / desktop.type.",
+                                "fields, menus and text, including controls only visible on screen (\"seen\": "
+                                "\"on screen\", e.g. unlabeled icons). Use the numbers with desktop.click / desktop.type.",
                     input_model=LookArgs, output_model=LookOut, permissions=frozenset({Permission.APP_CONTROL}),
-                    side_effect=SideEffect.READ_ONLY, timeout_s=30, idempotency=Idempotency.IDEMPOTENT,
-                    verification="controls read live from UI Automation", max_retries=1)
+                    side_effect=SideEffect.READ_ONLY, timeout_s=60, idempotency=Idempotency.IDEMPOTENT,
+                    verification="controls read live from UI Automation, plus local OCR and element detection",
+                    max_retries=1)
 
     def run(self, args: LookArgs, ctx: ToolContext) -> LookOut:
         if sys.platform != "win32":
@@ -166,9 +195,20 @@ class DesktopLookTool(Tool[LookArgs, LookOut]):
                              "rect": (r.left, r.top), "item": items[-1]}
                 if len(items) >= MAX_ITEMS:
                     break
+            n_uia, note = len(items), ""
+            if args.vision and len(items) < MAX_ITEMS:
+                rects = [(r.left, r.top, r.right, r.bottom) for r in
+                         (c.BoundingRectangle for c in _walk(auto, win) if _useful(auto, c))]
+                try:
+                    more, mcrit = _vision_items(auto, win, rects, len(items) + 1)
+                    items += more
+                    crit.update(mcrit)
+                    note = f", {len(more)} more seen on screen"
+                except Exception as e:  # noqa: BLE001 - the screen pass is extra; UIA results still stand
+                    note = f" (screen reading failed: {type(e).__name__})"
             _Snap.items, _Snap.app = crit, args.app.lower()
             return LookOut(app=args.app, title=win.Name, elements=items,
-                           evidence=f"'{win.Name}': {len(items)} controls")
+                           evidence=f"'{win.Name}': {n_uia} controls from UI Automation{note}")
 
 
 class RefArgs(BaseModel):
@@ -205,6 +245,8 @@ class DesktopClickTool(Tool[RefArgs, ActOut]):
         self.precheck(args)
         crit = _crit(args.ref)
         from orion.tools.windows.notepad import _uia
+        if crit.get("vision"):
+            return self._click_seen(crit, _uia)
         with _uia() as auto:
             win = _find_window(auto, _Snap.app)
             c = _refind(auto, win, crit)
@@ -233,6 +275,39 @@ class DesktopClickTool(Tool[RefArgs, ActOut]):
             time.sleep(0.3)
         return ActOut(detail=how, evidence=f"{how} '{crit['name']}' in {_Snap.app}")
 
+    def _click_seen(self, crit: dict[str, Any], _uia) -> ActOut:
+        """Mouse click on an element found on screen: only if the window has not moved and is under the point."""
+        from orion.grounding.screen import ensure_dpi_aware, window_rect
+        ensure_dpi_aware()
+        label = crit["name"] or "the unlabeled icon"
+        with _uia() as auto:
+            win = _find_window(auto, _Snap.app)
+            hwnd = win.NativeWindowHandle
+            r = window_rect(hwnd)
+            if (r.left, r.top) != crit["win"]:
+                raise ToolError(ErrorCode.STALE_STATE, "the window moved since the last look; use desktop.look again")
+            x1, y1, x2, y2 = crit["box"]
+            x, y = (x1 + x2) // 2, (y1 + y2) // 2
+            win.SetActive()
+            time.sleep(0.2)
+            user32 = ctypes.WinDLL("user32")
+            user32.WindowFromPoint.restype = wintypes.HWND
+            user32.GetAncestor.restype = wintypes.HWND
+            top = int(user32.GetAncestor(user32.WindowFromPoint(wintypes.POINT(x, y)), 2) or 0)
+            if top != hwnd:
+                buf = ctypes.create_unicode_buffer(120)
+                user32.GetWindowTextW(wintypes.HWND(top), buf, 120)
+                raise ToolError(ErrorCode.STALE_STATE, f"another window ('{buf.value or 'untitled'}') covers '{label}' "
+                                                       f"at ({x},{y}); did not click")
+            old = wintypes.POINT()
+            user32.GetCursorPos(ctypes.byref(old))
+            auto.Click(x, y, waitTime=0.1)
+            user32.SetCursorPos(old.x, old.y)
+            time.sleep(0.3)
+        return ActOut(detail=f"clicked at ({x},{y})",
+                      evidence=f"clicked '{label}' (seen on screen) at ({x},{y}) in {_Snap.app}; "
+                               f"check the result with desktop.look")
+
 
 class TypeArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -249,6 +324,9 @@ class DesktopTypeTool(Tool[TypeArgs, ActOut]):
 
     def run(self, args: TypeArgs, ctx: ToolContext) -> ActOut:
         crit = _crit(args.ref)
+        if crit.get("vision"):
+            raise ToolError(ErrorCode.INVALID_INPUT, f"'{crit['name'] or 'that element'}' was only seen on screen, so "
+                                                     f"it cannot be set directly: desktop.click it, then desktop.keys")
         from orion.tools.windows.notepad import _uia
         with _uia() as auto:
             win = _find_window(auto, _Snap.app)

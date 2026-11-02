@@ -25,7 +25,7 @@ class LLMBackendError(RuntimeError):
 class OllamaBackend:
     def __init__(self, model: str = "phi3.5", url: str = "http://127.0.0.1:11434",
                  schema: dict[str, Any] | None = None, timeout_s: float = 180, num_ctx: int = 8192, seed: int = 0,
-                 num_predict: int = 1024):
+                 num_predict: int = 1024, think: bool | None = None):
         host = urlparse(url).hostname
         if host not in _LOCAL:
             raise ValueError(f"refusing non-local LLM endpoint {url!r} (local-first rule)")
@@ -33,6 +33,9 @@ class OllamaBackend:
         # num_predict caps output length: a plan needs ~300 tokens; the cap stops runaway generations.
         self.timeout_s, self.num_ctx, self.seed, self.num_predict = timeout_s, num_ctx, seed, num_predict
         self.calls: list[dict[str, Any]] = []   # per-call latency and token counts
+        # Reasoning models (Qwen3) think before answering unless told not to; the hidden reasoning
+        # eats num_predict and slows every step. Off by default for them; None sends nothing (older models).
+        self.think = think if think is not None else (False if model.startswith("qwen3") else None)
 
     def health(self) -> str:
         """Return the server version, or raise LLMBackendError if the server or model is unavailable."""
@@ -62,6 +65,8 @@ class OllamaBackend:
         }
         if self.schema is not None:
             body["format"] = self.schema
+        if self.think is not None:
+            body["think"] = self.think
         req = urllib.request.Request(f"{self.url}/api/generate", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
         t0 = time.monotonic()

@@ -89,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(cfg.log_dir, cfg.log_level)
     backend = Backend(cfg, a.model)
     _serve_demo_site()
+    from orion.grounding import detector
+    detector.warm_up_in_background()   # first desktop.look would otherwise wait ~15 s for the model
     hk = HotkeyThread(cfg.kill_hotkey, backend.stop)
     hk.start()
     hk.ready.wait(3)
