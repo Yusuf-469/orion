@@ -23,6 +23,8 @@ dev = ["pytest>=8", "pytest-timeout>=2.3"]
 # https://download.pytorch.org/whl/cu128 for the RTX GPU). Not needed to run ORION.
 ml = ["scikit-learn>=1.5", "joblib>=1.4", "torch>=2.4", "torchvision>=0.19", "transformers>=4.45",
       "peft>=0.12", "sentencepiece>=0.2", "protobuf>=4"]
+# GPU energy per task (NVIDIA's own counter; BSD-3). Optional: without it energy is reported as unknown.
+energy = ["nvidia-ml-py>=12.560.30"]
 
 [project.scripts]
 orion = "orion.app.main:main"

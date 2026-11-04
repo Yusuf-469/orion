@@ -14,6 +14,8 @@
 - **UFO** by Microsoft (github.com/microsoft/UFO), MIT. Its practice of driving Office through the applications' own APIs instead of clicking led to `src/orion/tools/office.py` (excel.read, excel.write, office.export_pdf over COM), written for ORION: a private hidden Office instance per call, macros forced off, read-only opening, new files only, read-back verification. No UFO code is used.
 - **Open Interpreter** (github.com/openinterpreter/openinterpreter), Apache-2.0: reviewed, not used. It is now a coding-agent harness that works by running model-written shell code, which ORION's rules forbid.
 
+- **OpenJarvis** (Stanford, github.com/open-jarvis/OpenJarvis), Apache-2.0. ORION's GPU energy measurement (`src/orion/observability/energy.py`, used by `scripts/agent_trial.py`) follows its NVIDIA method: the difference of the driver's cumulative energy counter before and after the work (their "intelligence per watt" research). Re-implemented in a few lines; no OpenJarvis code or dependency. Uses nvidia-ml-py (BSD-3), optional.
+
 ## Code adapted
 - **OmniParser** by Microsoft (github.com/microsoft/OmniParser), code MIT. `src/orion/grounding/detector.py` adapts the YOLOv9 detector wrapper (`util/yolov9.py`): letterbox preprocessing, anchor-free decode and NMS. Weight `icon_detect_v3` (microsoft/OmniParser-v2.0 on Hugging Face, revision refs/pr/37), MIT, downloaded to `models/omniparser/` and not committed. Only the MIT detector is used; the older Ultralytics-based AGPL detectors and the caption models are not.
 

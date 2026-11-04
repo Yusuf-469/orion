@@ -118,8 +118,10 @@ def main() -> int:
                                                                f"{json.dumps(e.get('args', e.get('evidence', '')))[:150]}",
                                                                flush=True)),
                   facts=FACTS if a.task == "form" else "")
+    from orion.observability.energy import GpuEnergy
     t0 = time.monotonic()
-    res = agent.run(GOALS[a.task].format(site=site), CancelToken())
+    with GpuEnergy() as energy:   # GPU joules for the whole task (method from OpenJarvis)
+        res = agent.run(GOALS[a.task].format(site=site), CancelToken())
     secs = time.monotonic() - t0
 
     checks = {}
@@ -187,10 +189,13 @@ def main() -> int:
     f = out / f"{a.task}_{a.model.replace(':', '-')}_{time.strftime('%Y%m%d-%H%M%S')}.json"
     f.write_text(json.dumps({"task": a.task, "model": a.model, "goal": GOALS[a.task], "status": res.status,
                              "summary": res.summary, "steps": len(res.steps), "seconds": round(secs, 1),
+                             "gpu_joules": None if energy.joules is None else round(energy.joules, 1),
                              "checks": checks, "confirmations": confirmer.asked, "questions": asker.asked,
                              "trace": [s.__dict__ for s in res.steps], "llm_calls": llm.calls},
                             indent=1, default=str), encoding="utf-8")
-    print(f"\n{res.status}: {res.summary}\n{len(res.steps)} steps, {secs:.0f}s\nchecks: {checks}\n-> {f}")
+    used = "unknown" if energy.joules is None else f"{energy.joules:.0f} J ({energy.watts:.0f} W average)"
+    print(f"\n{res.status}: {res.summary}\n{len(res.steps)} steps, {secs:.0f}s, GPU energy {used}\n"
+          f"checks: {checks}\n-> {f}")
     return 0 if all(checks.values()) else 1
 
 
